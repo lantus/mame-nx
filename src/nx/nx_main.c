@@ -6,6 +6,7 @@
 #include "driver.h"
 #include "usrintrf.h"
 
+/*
 int main(int argc, char **argv)
 {
 	
@@ -24,7 +25,7 @@ int main(int argc, char **argv)
 
 	}
 
-}
+}*/
 
 
 int osd_init( void )

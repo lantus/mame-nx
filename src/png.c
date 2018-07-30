@@ -343,6 +343,7 @@ int png_read_file(mame_file *fp, struct png_info *p)
 	return 1;
 }
 
+#ifndef SWITCH
 int png_read_info(mame_file *fp, struct png_info *p)
 {
 	UINT32 chunk_length, chunk_type=0, chunk_crc, crc;
@@ -451,6 +452,8 @@ int png_read_info(mame_file *fp, struct png_info *p)
 	}
 	return res;
 }
+
+#endif
 
 /*	Expands a p->image from p->bit_depth to 8 bit */
 int png_expand_buffer_8bit (struct png_info *p)
@@ -608,6 +611,7 @@ static int write_chunk(mame_file *fp, UINT32 chunk_type, UINT8 *chunk_data, UINT
 	return 1;
 }
 
+#ifndef SWITCH
 int png_write_sig(mame_file *fp)
 {
 	/* PNG Signature */
@@ -618,6 +622,7 @@ int png_write_sig(mame_file *fp)
 	}
 	return 1;
 }
+#endif
 
 int png_write_datastream(mame_file *fp, struct png_info *p)
 {

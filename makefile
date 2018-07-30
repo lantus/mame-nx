@@ -8,8 +8,45 @@ export BUILD_EXEFS_SRC := build/exefs
  
 include $(DEVKITPRO)/libnx/switch_rules
 
+APP_TITLE 	:= mame-nx
+APP_AUTHOR 	:= MVG
+APP_VERSION := 1.0.0
+ICON 		:= Icon.jpg
+BUILD		:=	build
+DATA		:=	data
+INCLUDES	:=	include
+EXEFS_SRC	:=	exefs_src
+ROMFS		:=	RomFS
+
+
 BINDIR	  = release
 OUTPUT    = mame
+
+ifeq ($(strip $(ICON)),)
+	icons := $(wildcard *.jpg)
+	ifneq (,$(findstring $(TARGET).jpg,$(icons)))
+		export APP_ICON := $(TOPDIR)/$(TARGET).jpg
+	else
+		ifneq (,$(findstring icon.jpg,$(icons)))
+			export APP_ICON := $(TOPDIR)/icon.jpg
+		endif
+	endif
+else
+	export APP_ICON := $(TOPDIR)/$(ICON)
+endif
+
+ifeq ($(strip $(NO_ICON)),)
+	export NROFLAGS += --icon=$(APP_ICON)
+endif
+ 
+
+ifneq ($(APP_TITLEID),)
+	export NACPFLAGS += --titleid=$(APP_TITLEID)
+endif
+
+ifneq ($(ROMFS),)
+	export NROFLAGS += --romfsdir=$(CURDIR)/$(ROMFS)
+endif
 
 # set this to mame, mess or the destination you want to build
 # TARGET = mame
@@ -61,7 +98,8 @@ VPATH=src $(wildcard src/cpu/*)
 # compiler, linker and utilities
 AR = @ar
 CC = aarch64-none-elf-gcc
-LD = aarch64-none-elf-gcc
+CXX = aarch64-none-elf-g++
+LD = aarch64-none-elf-g++
 ASM = @nasm
 ASMFLAGS = -f coff
 MD = -mkdir
@@ -110,8 +148,19 @@ EMULATOR = $(BINDIR)/$(NAME).elf
 
 DEFS = -DLSB_FIRST -DINLINE="static __inline__" -DSWITCH
 
-CFLAGS = -std=gnu99 -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/portlibs/switch/include
-
+CFLAGS = -std=gnu99 -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
+CXXFLAGS = -std=gnu99 -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
+CXXFLAGS += -DNDEBUG \
+	$(ARCH) -w -O3 -fomit-frame-pointer -fstrict-aliasing \
+	-Wall -Wno-sign-compare -Wunused \
+	-Wpointer-arith -Wcast-align -Waggregate-return \
+	-Wshadow -Wundef \
+	-Wformat-security -Wwrite-strings \
+	-Wdisabled-optimization \
+	-Wno-sizeof-pointer-memaccess \
+	-mtune=cortex-a57 -mtp=soft -fPIE -fomit-frame-pointer \
+	-fno-exceptions -std=c++11
+	
 ifdef SYMBOLS
 CFLAGS += -O0 -Wall -Werror -Wno-unused -g
 else
@@ -136,7 +185,8 @@ CFLAGS += -DNDEBUG \
 #	-Wmissing-declarations
 endif
 
-CFLAGSPEDANTIC = $(CFLAGS) -pedantic
+#CFLAGSPEDANTIC = $(CFLAGS) -pedantic
+CFLAGSPEDANTIC = $(CFLAGS)
 
 ifdef SYMBOLS
 LDFLAGS =
@@ -152,7 +202,7 @@ MAPFLAGS =
 endif
 
 # platform .mak files will want to add to this
-LIBS = -lz -lnx -lm
+LIBS = -lfreetype -lSDL2_ttf -lSDL2_gfx -lSDL2_image -lpng -ljpeg `sdl2-config --libs` `freetype-config --libs` -lz -lnx -lm
 
 OBJDIRS = obj $(OBJ) $(OBJ)/cpu $(OBJ)/sound $(OBJ)/$(MAMEOS) \
 	$(OBJ)/drivers $(OBJ)/machine $(OBJ)/vidhrdw $(OBJ)/sndhrdw
@@ -189,11 +239,18 @@ extra:	$(TOOLS) $(TEXTS)
 
 # combine the various definitions to one
 CDEFS = $(DEFS) $(COREDEFS) $(CPUDEFS) $(SOUNDDEFS) $(ASMDEFS) $(DBGDEFS)
+ 
+$(OBJ)/nx/nx_maintest.o: src/nx/nx_maintest.cpp 
+	$(CXX) $(CDEFS) $(CXXFLAGS) -c src/nx/nx_maintest.cpp -o $(OBJ)/nx/nx_maintest.o
+	
+$(OBJ)/nx/nx_romlist.o : src/nx/nx_romlist.cpp 	
+	$(CXX) $(CDEFS) $(CXXFLAGS) -c src/nx/nx_romlist.cpp -o $(OBJ)/nx/nx_romlist.o 
 
 # primary target
-$(EMULATOR): $(OBJS) $(COREOBJS) $(OSOBJS) $(DRVLIBS)
+$(EMULATOR): $(OBJS) $(COREOBJS) $(OSOBJS) $(DRVLIBS) 
 # always recompile the version string
 	$(CC) $(CDEFS) $(CFLAGS) -c src/version.c -o $(OBJ)/version.o
+# Switch UI Elements
 	@echo Linking $@...
 	$(LD) $(LDFLAGS) $(OBJS) $(COREOBJS) $(OSOBJS) $(LIBS) $(DRVLIBS) -o $@ $(MAPFLAGS)
 
@@ -263,6 +320,7 @@ $(OBJ)/cpu/m68000/68020.o:  $(OBJ)/cpu/m68000/68020.asm
 	@echo Assembling $<...
 	$(ASM) -o $@ $(ASMFLAGS) $(subst -D,-d,$(ASMDEFS)) $<
 endif
+ 
 $(OBJ)/%.a:
 	@echo Archiving $@...
 	$(RM) $@
@@ -293,6 +351,7 @@ check: $(EMULATOR) xml2info$(EXE)
 	./xml2info < $(NAME).xml > $(NAME).lst
 	./xmllint --valid --noout $(NAME).xml
 
+	
 	
 #---------------------------------------------------------------------------------
 # main targets
