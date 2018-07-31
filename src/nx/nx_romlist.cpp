@@ -79,13 +79,14 @@ int CRomList::RefreshRomList()
 
 	if (m_ListData.empty())
 	{
-
-		for (int d = 0; d < 4; d++) 
+		// update this for multiple rom paths
+		
+		for (int d = 0; d < 1; d++) 
 		{			
 			DIR* dir;
 			struct dirent* ent;
 
-			dir = opendir("sdmc:/roms/");//Open current-working-directory.
+			dir = opendir("roms/");//Open current-working-directory.
 			
 			if(dir==NULL)
 			{
@@ -97,7 +98,7 @@ int CRomList::RefreshRomList()
 				
 				while ((ent = readdir(dir)))
 				{
-					svcOutputDebugString( ent->d_name, 80);
+					//svcOutputDebugString( ent->d_name, 80);
 												
 					std::vector<std::string>::iterator iter = std::find(m_ListData.begin(), m_ListData.end(), ent->d_name);
 					if (iter == m_ListData.end()) {

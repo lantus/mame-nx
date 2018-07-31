@@ -16,6 +16,22 @@ using namespace std;
 extern std::vector<std::string> m_vecAvailRomList;
 extern CRomList romList;	
  
+const int GAMESEL_MaxWindowList	= 16;		 
+const int GAMESEL_WindowMiddle = 8;	
+
+
+float fGameSelect;
+float fCursorPos;
+float fMaxCount;
+float m_fFrameTime;			// amount of time per frame
+
+int	  iGameSelect;
+int	  iCursorPos;
+int	  iNumGames;
+int	  LastPos;
+int	  iMaxWindowList;
+int	  iWindowMiddle;
+ 
 int dr = 0;
 int dg = 0;
 int db = 0;
@@ -117,7 +133,9 @@ namespace UI
 
     void Draw()
     {
-
+		char currentName[120];
+		int	iTempGameSel;
+		int	iGameidx;
 	
         SDL_RenderClear(sdl_render);
         DrawBack(sdls_Back, sdlt_Back);
@@ -164,33 +182,44 @@ namespace UI
 				} 
 				
                 DrawText(fntLarge, ox, oy, { 140, 255, 255, 255 }, options[i].c_str());
-                if(i == 0)
+                
+				if(i == 0)
                 {
                     int fx = 450;
                     int fy = 235;
-                    for(int j = 0; j < m_vecAvailRomList.size(); j++)
-                    {
-                        if(j == fselected)
-                        {
-                            DrawText(fntLarge, fx, fy, { selRed, selGreen, selBlue, 255 }, m_vecAvailRomList[j].c_str());
-                        }
-                        else DrawText(fntLarge, fx, fy, txtcolor, m_vecAvailRomList[j].c_str());
-                        fy += 35;
-                    }
+					 
+					
+					// draw	game list entries
+
+					iGameSelect	= fGameSelect;
+					iCursorPos = fCursorPos;
+					iTempGameSel = iGameSelect;
+
+					if (iNumGames == 0)	
+						DrawText(fntLarge, 320, 202, txtcolor, "No Roms Found");	 
+					for	(iGameidx=0; iGameidx<iMaxWindowList;	iGameidx++)
+					{
+						
+						sprintf( currentName, "");
+						sprintf( currentName, "%s\n", m_vecAvailRomList[iTempGameSel++].c_str() );
+
+
+						if (iGameidx==iCursorPos){
+							 
+							DrawText(fntLarge, fx, fy + (28*iGameidx), { selRed, selGreen, selBlue, 255 }, currentName);
+						}
+						else
+						{
+							DrawText(fntLarge, fx, fy + (28*iGameidx), txtcolor, currentName);
+						}
+
+					}
+
+
                 }
                 else if(i == 1)
                 {
-                    DrawText(fntMedium, 475, 200, txtcolor, "NXPlay - Multimedia player, by XorTroll");
-                    DrawText(fntMedium, 500, 250, txtcolor, "Move between pages using L-stick.");
-                    DrawText(fntMedium, 500, 275, txtcolor, "Move between audio files using R-stick on the player page.");
-                    DrawText(fntMedium, 500, 300, txtcolor, "Start playing an audio or play another one pressing A.");
-                    DrawText(fntMedium, 500, 325, txtcolor, "Change volume up/down using D-pad.");
-                    DrawText(fntMedium, 500, 350, txtcolor, "Pause/resume playing audio pressing Y.");
-                    DrawText(fntMedium, 500, 375, txtcolor, "Restart audio playback pressing X.");
-                    DrawText(fntMedium, 500, 400, txtcolor, "Stop audio playback pressing B.");
-                    DrawText(fntMedium, 500, 425, txtcolor, "Exit app pressing Plus or Minus.");
-                    DrawText(fntMedium, 475, 475, txtcolor, "Supported types: MP3, WAV, OGG, FLAC, MOD audios");
-                    DrawText(fntMedium, 475, 500, txtcolor, "Video support coming soon!");
+                   
                 }
             }
             else DrawText(fntLarge, ox, oy, txtcolor, options[i].c_str());
@@ -202,11 +231,139 @@ namespace UI
     
     void Loop()
     {
-		Draw();
+		hidScanInput();
+        int k = hidKeysDown(CONTROLLER_P1_AUTO);
+        int h = hidKeysHeld(CONTROLLER_P1_AUTO);
+        if(h & KEY_DUP)
+        {            
+            Draw();
+        }
+        else if(h & KEY_DDOWN)
+        {
+             
+            Draw();       
+		}
+		else if(h & KEY_ZL)
+        {
+			// default don`t clamp cursor
+			bool bClampCursor =	false;
+
+			fCursorPos --;
+			if(	fCursorPos < iWindowMiddle )
+			{
+				// clamp cursor	position
+				bClampCursor = true;
+
+				// backup window pos
+				fGameSelect	--;
+
+				// clamp game window range (low)
+				if(fGameSelect < 0)
+				{
+					// clamp to	start
+					fGameSelect	= 0;
+
+					// backup cursor pos after all!
+					bClampCursor = false;
+
+					// clamp cursor	to end
+					if(	fCursorPos < 0 )
+						fCursorPos = 0;
+				}
+			}
+
+			// check for cursor	clamp
+			if(	bClampCursor )
+				fCursorPos = iWindowMiddle;	
+
+			Draw();
+        }
+        else if(h & KEY_ZR)
+        {
+ 
+			// default don`t clamp cursor
+			bool bClampCursor =	false;
+
+			fCursorPos ++;
+
+			if(	fCursorPos > iWindowMiddle )
+			{
+				// clamp cursor	position
+				bClampCursor = true;
+
+				// advance gameselect
+				if(fGameSelect == 0) fGameSelect +=	(fCursorPos	- iWindowMiddle);
+				else fGameSelect ++;
+			 
+				// clamp game window range (high)
+				if((fGameSelect	+ iMaxWindowList)	> iNumGames)
+				{
+
+					// clamp to	end
+					fGameSelect	= iNumGames	- iMaxWindowList;
+
+					// advance cursor pos after	all!
+					bClampCursor = false;
+
+					// clamp cursor	to end
+					if((fGameSelect	+ fCursorPos) >= iNumGames)
+						fCursorPos = iMaxWindowList-1;
+				}
+			}
+
+			// check for cursor	clamp
+			if(	bClampCursor )
+				fCursorPos = iWindowMiddle;	
+			
+			Draw();
+        }
+		
+		
+		
+        if(k & KEY_LSTICK_UP)
+        {
+            if(selected > 0) selected -= 1;
+            else selected = options.size() - 1;
+            Draw();
+        }
+        else if(k & KEY_LSTICK_DOWN)
+        {
+           
+
+			 Draw();
+        }
+        
+        else if(k & KEY_X)
+        {
+             
+            Draw();
+        }
+        else if(k & KEY_Y)
+        {
+             
+            Draw();
+        }
+        else if(k & KEY_A)
+        {
+            
+            
+            Draw();
+        }
+        else if(k & KEY_B)
+        {
+            
+            Draw();
+        }
+        else if(k & KEY_PLUS || k & KEY_MINUS) Exit();
     }
 
     void Init()
     {
+		fGameSelect	= 0.0f;
+		iGameSelect	= 0;
+		fCursorPos = 0.0f;
+		iCursorPos = 0;
+	
         romfsInit();
         ColorSetId id;
         setsysInitialize();
@@ -234,7 +391,21 @@ namespace UI
 		options.push_back("Quit");
          
 		sprintf(RomCountText,"%d/%d Games Found",romList.AvRoms(), romList.totalMAMEGames);	 
+		
+		
+		iNumGames =	romList.AvRoms();
 
+		if (iNumGames <	GAMESEL_MaxWindowList)
+		{
+			iMaxWindowList = iNumGames;
+			iWindowMiddle	 = iNumGames/2;
+		}
+		else
+		{
+			iMaxWindowList = GAMESEL_MaxWindowList;
+			iWindowMiddle	 = GAMESEL_WindowMiddle;
+		}
+	
 		
 		selRed = 255;
 		selGreen = 0;

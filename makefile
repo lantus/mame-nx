@@ -328,9 +328,10 @@ $(OBJ)/%.a:
 
 makedir:
 	@echo make makedir is no longer necessary, just type make
+	$(MD) release
 
 $(sort $(OBJDIRS)):
-	$(MD) $@
+	$(MD) $@	
 
 maketree: $(sort $(OBJDIRS))
 
