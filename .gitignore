@@ -1,3 +1,8 @@
 
 *.o
 *.a
+obj/mame/cpu/m68000/m68kopac.c
+obj/mame/cpu/m68000/m68kopdm.c
+obj/mame/cpu/m68000/m68kopnz.c
+obj/mame/cpu/m68000/m68kops.c
+obj/mame/cpu/m68000/m68kops.h

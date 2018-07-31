@@ -172,21 +172,10 @@ CFLAGS += -DNDEBUG \
 	-Wformat-security -Wwrite-strings \
 	-Wdisabled-optimization \
 	-Wno-sizeof-pointer-memaccess \
-	-mtune=cortex-a57 -mtp=soft -fPIE -fomit-frame-pointer \
-#	-Wredundant-decls
-#	-Wfloat-equal
-#	-Wunreachable-code -Wpadded
-#	-W had to remove because of the "missing initializer" warning
-#	-Wlarger-than-262144  \
-#	-Wcast-qual \
-#	-Wwrite-strings \
-#	-Wconversion \
-#	-Wmissing-prototypes \
-#	-Wmissing-declarations
+	-mtune=cortex-a57 -mtp=soft -fPIE -fomit-frame-pointer
 endif
 
-#CFLAGSPEDANTIC = $(CFLAGS) -pedantic
-CFLAGSPEDANTIC = $(CFLAGS)
+CFLAGSPEDANTIC = $(CFLAGS) -pedantic
 
 ifdef SYMBOLS
 LDFLAGS =
@@ -216,7 +205,7 @@ OBJDIRS	+= $(OBJ)/mmsnd $(OBJ)/mmsnd/machine $(OBJ)/mmsnd/drivers $(OBJ)/mmsnd/s
 endif
 
 all:	maketree $(EMULATOR) extra
-
+ 
 # include the various .mak files
 include src/core.mak
 include src/$(TARGET).mak
@@ -327,13 +316,13 @@ $(OBJ)/%.a:
 	$(AR) cr $@ $^
 
 makedir:
-	@echo make makedir is no longer necessary, just type make
-	$(MD) release
+	@echo make makedir is no longer necessary, just type make	
 
 $(sort $(OBJDIRS)):
 	$(MD) $@	
 
 maketree: $(sort $(OBJDIRS))
+		  $(MD) release
 
 clean:
 	@echo Deleting object tree $(OBJ)...
