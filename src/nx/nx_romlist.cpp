@@ -128,10 +128,10 @@ int CRomList::RefreshRomList()
 		sprintf(fullname,"%s.zip",drivers[totalMAMEGames]->name);
 		
 		vecAvailRomListFileName.push_back(fullname);
-		vecAvailRomList.push_back(drivers[totalMAMEGames]->name);
-		vecAvailRomIndex.push_back(totalMAMEGames);
+		//vecAvailRomList.push_back(drivers[totalMAMEGames]->name);
+		//vecAvailRomIndex.push_back(totalMAMEGames);
 
-		mapType[fullname] = totalMAMEGames;
+		//mapType[drivers[totalMAMEGames]->name] = totalMAMEGames;
 		mapRoms[drivers[totalMAMEGames]->description] = totalMAMEGames;
 
 	}

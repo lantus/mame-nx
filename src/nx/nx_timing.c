@@ -10,7 +10,7 @@
 //-------------------------------------------------------------
 cycles_t osd_cycles( void )
 {
-	return 0;
+	return svcGetSystemTick();
 }	
 
 
@@ -19,7 +19,7 @@ cycles_t osd_cycles( void )
 //-------------------------------------------------------------
 cycles_t osd_cycles_per_second( void )
 {
-	return 0;
+	return 19200000;
 }
 
 //-------------------------------------------------------------
@@ -27,7 +27,7 @@ cycles_t osd_cycles_per_second( void )
 //-------------------------------------------------------------
 cycles_t osd_profiling_ticks( void )
 {
-	return 0;
+	return svcGetSystemTick();
 }
 
 

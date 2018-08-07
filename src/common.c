@@ -951,7 +951,7 @@ const struct RomModule *rom_next_chunk(const struct RomModule *romp)
 
 void CLIB_DECL debugload(const char *string, ...)
 {
-#ifdef LOG_LOAD
+ 
 	static int opened;
 	va_list arg;
 	FILE *f;
@@ -964,7 +964,8 @@ void CLIB_DECL debugload(const char *string, ...)
 		va_end(arg);
 		fclose(f);
 	}
-#endif
+ 
+ 
 }
 
 
@@ -1623,10 +1624,12 @@ static int process_rom_entries(struct rom_load_data *romdata, const struct RomMo
 			}
 		}
 	}
+	 
 	return 1;
 
 	/* error case */
 fatalerror:
+	 
 	if (romdata->file)
 		mame_fclose(romdata->file);
 	romdata->file = NULL;
@@ -1833,12 +1836,13 @@ int rom_load(const struct RomModule *romp)
 
 		/* now process the entries in the region */
 		if (ROMREGION_ISROMDATA(region))
-		{
+		{			 
 			if (!process_rom_entries(&romdata, region + 1))
 				return 1;
 		}
 		else if (ROMREGION_ISDISKDATA(region))
 		{
+			svcOutputDebugString("disk entries",20);
 			if (!process_disk_entries(&romdata, region + 1))
 				return 1;
 		}

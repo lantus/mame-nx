@@ -803,7 +803,7 @@ static mame_file *generic_fopen(int pathtype, const char *gamename, const char *
 	int pathindex, pathstart, pathstop, pathinc;
 	mame_file file, *newfile;
 	char tempname[256];
-
+	 
 	LOG(("generic_fopen(%d, %s, %s, %s, %X)\n", pathc, gamename, filename, extension, flags));
 
 	/* reset the file handle */

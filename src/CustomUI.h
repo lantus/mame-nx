@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <map> 
 #include <functional>
 using namespace std;
 
@@ -12,8 +13,17 @@ using namespace std;
 #include <SDL2/SDL_mixer.h>
 #include <SDL2/SDL_ttf.h>
 #include "nx_romlist.h"
+
+
+extern "C" {
+#include "osd_cpu.h"
+#include "driver.h"
+#include "mame.h"
+}
+
  
 extern std::vector<std::string> m_vecAvailRomList;
+extern std::map<std::string, int> mapRoms;
 extern CRomList romList;	
  
 const int GAMESEL_MaxWindowList	= 16;		 
@@ -344,9 +354,12 @@ namespace UI
             Draw();
         }
         else if(k & KEY_A)
-        {
-            
-            
+        {			
+			char szRom[255];			
+            int gameIndex = mapRoms[m_vecAvailRomList[iGameSelect]];
+			sprintf(szRom,"Launching ROM %s with Index %d\n",m_vecAvailRomList[iGameSelect].c_str(), gameIndex);
+			svcOutputDebugString(szRom,255);
+            run_game(gameIndex);
             Draw();
         }
         else if(k & KEY_B)
