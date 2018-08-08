@@ -5,6 +5,8 @@
 #include "osdepend.h"
 #include "driver.h"
 #include "usrintrf.h"
+ 
+#include <switch/gfx/gfx.h> 
 
 static INT32 frameCount = 0;
 static float g_desiredFPS = 0.0f;
@@ -18,13 +20,24 @@ UINT32	g_pal32Lookup[65536] = {0};
 int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_components )
 {
   
-	//gfxInitDefault();
+	gfxInitDefault();
 	
 	set_ui_visarea( 0,0,0,0 );
 	
-	rgb_components[0] = 0x7c00;
-	rgb_components[1] = 0x03e0;
-	rgb_components[2] = 0x001f;
+	if(Machine->color_depth == 15)
+	{
+      /* 32bpp only */
+		rgb_components[0] = 0x7C00;
+		rgb_components[1] = 0x03E0;
+		rgb_components[2] = 0x001F;  
+	}
+	else if(Machine->color_depth == 32)
+	{
+		rgb_components[0] = 0xFF0000;
+		rgb_components[1] = 0x00FF00;
+		rgb_components[2] = 0x0000FF;
+	}
+
 	
 	// Store the creation params
 	memcpy( &g_createParams, params, sizeof(g_createParams) );
@@ -45,6 +58,9 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 		g_createParams.aspect_y = temp;
 	}
 	
+	
+  nx_SetResolution(g_createParams.width,g_createParams.height);
+  
   return 0;
 }
 
@@ -74,14 +90,7 @@ void osd_update_video_and_audio(struct mame_display *display)
   
 	if( display->changed_flags & GAME_VISIBLE_AREA_CHANGED )
 	{
-		
-		char debug[255];
-		
-		sprintf(debug, "setting ui vis area min_x = %d, min_y = %d, max_x = %d , max_y = %d\n", display->game_visible_area.min_x,display->game_visible_area.min_y,
-					display->game_visible_area.max_x, display->game_visible_area.max_y);
-		 
-		svcOutputDebugString(debug,255);
-		
+				
 			// Pass the new coords on to the UI
 		set_ui_visarea( display->game_visible_area.min_x,
 										display->game_visible_area.min_y,
@@ -90,13 +99,44 @@ void osd_update_video_and_audio(struct mame_display *display)
 	}
 
 	if( display->changed_flags & GAME_PALETTE_CHANGED )
+	{	
 		nx_UpdatePalette( display );
+	}
 	
 	
 	if( display->changed_flags & GAME_BITMAP_CHANGED )
-	{
-		nx_SoftRender(	display->game_bitmap, &display->game_bitmap_update,NULL );
+	{		 
+		//nx_SoftRender(	display->game_bitmap, &display->game_bitmap_update,NULL );
 		
+		uint32_t width, height;
+		uint32_t pos;
+		uint32_t *framebuf = (uint32_t*) gfxGetFramebuffer((uint32_t*)&width, (uint32_t*)&height);
+	 		 
+         const uint32_t x = display->game_visible_area.min_x;
+         const uint32_t y = display->game_visible_area.min_y;
+         const uint32_t pitch = display->game_bitmap->rowpixels;
+
+         // Copy pixels
+         if(display->game_bitmap->depth == 16)
+         {            
+            const uint16_t* input = &((uint16_t*)display->game_bitmap->base)[y * pitch + x];
+
+            for(int i = 0; i < height; i ++)
+            {
+               for (int j = 0; j < width; j ++)
+               {
+					const uint32_t color = display->game_palette[*input++];                												
+					
+					framebuf[(uint32_t) gfxGetFramebufferDisplayOffset((uint32_t) j  , (uint32_t) i  )] = (((color >> 19) & 0x1f) << 11) | (((color >> 11) & 0x1f) << 6) |
+                     ((color >> 3) & 0x1f);
+					
+               }
+			   
+               input += pitch - width;
+            }
+			             
+         }
+ 
 		// Wait out the remaining time for this frame
 		if( lastFrameEndTime &&         
 			performance->game_speed_percent >= 99.0f  )
@@ -119,7 +159,10 @@ void osd_update_video_and_audio(struct mame_display *display)
 		lastFrameEndTime = osd_cycles();
 	}
 
-	
+	gfxFlushBuffers();
+	gfxSwapBuffers();
+	gfxWaitForVsync();
+
  
 }
 
@@ -150,7 +193,7 @@ int nx_SoftRender(	struct mame_bitmap *bitmap,
 
 	uint32_t width, height;
 	uint32_t pos;
-	uint32_t *framebuf = (uint32_t*) gfxGetFramebuffer((uint32_t*)&width, (uint32_t*)&height);
+	uint8_t *framebuf = (uint8_t*) gfxGetFramebuffer((uint32_t*)&width, (uint32_t*)&height);
 	frameCount ++;
 	     	
 	if( vector_dirty_pixels )
@@ -167,12 +210,13 @@ int nx_SoftRender(	struct mame_bitmap *bitmap,
 				  // Destination buffer is in 15 bit X1R5G5B5
 				nx_RenderDirect16( framebuf, bitmap, bounds );
 				
-				svcOutputDebugString("16 bit direct ",20);
+				svcOutputDebugString("nx_RenderDirect16",20);
 			}
 			else
 			{
 				  // Have to translate the colors through the palette lookup table
 				nx_RenderPalettized16( framebuf, bitmap, bounds );
+								
 			}
 		}
 		else if( bitmap->depth == 32 )
@@ -319,7 +363,70 @@ void nx_RenderDirect32( void *dest, struct mame_bitmap *bitmap, const struct rec
 //-------------------------------------------------------------
 void nx_RenderPalettized16( void *dest, struct mame_bitmap *bitmap, const struct rectangle *bnds )
 {
+
+	struct rectangle bounds = *bnds;
+	++bounds.max_x;
+	++bounds.max_y;
+
+	UINT32 *destBuffer;
+	UINT16 *sourceBuffer = (UINT16*)bitmap->base;
+
+	  // If we a filtering render into a temp buffer then filter that buffer
+	  // into the actual framebuffer
 	 
+	destBuffer = (UINT32*)dest;
+
+		// bitmap format is 16 bit indices into the palette
+		// Destination buffer is in 32 bit X8R8G8B8
+	if( g_createParams.orientation & ORIENTATION_SWAP_XY )
+	{ 
+		sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
+
+		// SwapXY
+		destBuffer += bounds.min_y;  // The bounds.min_y value gives us our starting X coord
+		destBuffer += (bounds.min_x * g_createParams.width); // The bounds.min_x value gives us our starting Y coord
+
+      // Render, treating sourceBuffer as normal (x and y not swapped)
+		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
+		{
+			UINT32	*offset = destBuffer;
+			UINT16  *sourceOffset = sourceBuffer;
+
+			for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
+			{
+			  // Offset is in RGBX format	
+				*offset = g_pal32Lookup[ *(sourceOffset++) ];
+
+			  // Skip to the next row
+				offset += g_createParams.width;   // Increment the output Y value
+			}
+
+			sourceBuffer += bitmap->rowpixels;
+			++destBuffer;          // Come left ("down") one row
+		}
+		
+	}
+	else
+	{
+			sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
+			destBuffer += (bounds.min_y * 720 + bounds.min_x);
+
+			for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
+			{
+				UINT32	*offset = destBuffer;
+				UINT16  *sourceOffset = sourceBuffer;
+
+				for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
+				{
+			  // Offset is in RGBX format	
+					*(offset++) = g_pal32Lookup[ *(sourceOffset++) ];
+				}
+
+				destBuffer += g_createParams.width;
+				sourceBuffer += bitmap->rowpixels;
+			}		
+
+	}
 	 
 }
 
@@ -353,3 +460,27 @@ void nx_UpdatePalette( struct mame_display *display )
 }
 
  
+void nx_SetResolution(uint32_t width, uint32_t height)
+{
+    uint32_t x, y, w, h, i;
+    uint32_t *fb;
+
+    // clear framebuffers before switching res
+    for (i = 0; i < 2; i++) {
+
+        fb = (uint32_t *) gfxGetFramebuffer(&w, &h);
+
+        for (y = 0; y < h; y++) {
+            for (x = 0; x < w; x++) {
+                fb[gfxGetFramebufferDisplayOffset(x, y)] =
+                    (uint32_t) RGBA8_MAXALPHA(0, 0, 0);
+            }
+        }
+
+        gfxFlushBuffers();
+        gfxSwapBuffers();
+        gfxWaitForVsync();
+    }
+
+    gfxConfigureResolution(width, height);
+} 
