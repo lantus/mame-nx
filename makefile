@@ -146,7 +146,7 @@ OBJ = obj/$(NAME)
 
 EMULATOR = $(BINDIR)/$(NAME).elf
 
-DEFS = -DLSB_FIRST -DINLINE="static __inline__" -DSWITCH
+DEFS = -DALIGN_SHORTS -DALIGN_INTS -DLSB_FIRST -DINLINE="static __inline__" -DSWITCH
 
 CFLAGS = -std=gnu99 -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
 CXXFLAGS = -std=gnu99 -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
