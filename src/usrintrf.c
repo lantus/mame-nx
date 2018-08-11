@@ -2298,6 +2298,8 @@ int showcopyright(struct mame_bitmap *bitmap)
 	strcat (buf, ui_getstring(UI_copyright3));
 
 	setup_selected = -1;////
+	
+#ifndef SWITCH	
 	done = 0;
 
 	do
@@ -2319,7 +2321,8 @@ int showcopyright(struct mame_bitmap *bitmap)
 				input_ui_pressed(IPT_UI_RIGHT)))
 			done = 2;
 	} while (done < 2);
-
+#endif
+	
 	setup_selected = 0;////
 	erase_screen(bitmap);
 	update_video_and_audio();
@@ -2457,8 +2460,12 @@ static int displaygameinfo(struct mame_bitmap *bitmap,int selected)
 		ui_displaymessagewindow(bitmap,buf);
 
 		sel = 0;
+#ifndef SWITCH		
 		if (code_read_async() != CODE_NONE)
 			sel = -1;
+#else
+		sel = 1;
+#endif	
 	}
 	else
 	{
@@ -2596,7 +2603,7 @@ int showgamewarnings(struct mame_bitmap *bitmap)
 
 		strcat(buf,"\n\n");
 		strcat(buf,ui_getstring (UI_typeok));
-
+#ifndef SWITCH	
 		done = 0;
 		do
 		{
@@ -2614,6 +2621,7 @@ int showgamewarnings(struct mame_bitmap *bitmap)
 					input_ui_pressed(IPT_UI_RIGHT)))
 				done = 2;
 		} while (done < 2);
+#endif		
 	}
 
 	erase_screen(bitmap);
