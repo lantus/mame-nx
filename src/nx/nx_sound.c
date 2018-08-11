@@ -3,30 +3,57 @@
 #include "osd_cpu.h"
 #include "driver.h"
  
+static float delta_samples;
+int samples_per_frame = 0;
+short *samples_buffer;
+short *conversion_buffer;
+int usestereo = 1;
  
-INT32 osd_start_audio_stream( INT32 stereo )
+ 
+int osd_start_audio_stream(int stereo)
 {
-	return 0;
+	delta_samples = 0.0f;
+	usestereo = stereo ? 1 : 0;
+
+	Machine->sample_rate = 22050;
+	
+	/* determine the number of samples per frame */
+	samples_per_frame = Machine->sample_rate / Machine->drv->frames_per_second;
+	
+
+	if (Machine->sample_rate == 0) return 0;
+
+	samples_buffer = (short *) calloc(samples_per_frame, 2 + usestereo * 2);
+	if (!usestereo) conversion_buffer = (short *) calloc(samples_per_frame, 4);
+	
+	
+	return samples_per_frame;
+
+
 }
 
-//---------------------------------------------------------------------
-//	osd_stop_audio_stream
-//---------------------------------------------------------------------
-void osd_stop_audio_stream( void )
+int osd_update_audio_stream(INT16 *buffer)
 {
-	// if nothing to do, don't do it
-	if( !Machine->sample_rate )
-		return;
- 
+		char sample_rate[100];
+	sprintf(sample_rate,"sample_rate = %d\n",Machine->sample_rate);
+	//svcOutputDebugString(sample_rate,100);
+	
+	memcpy(samples_buffer, buffer, samples_per_frame * (usestereo ? 4 : 2));
+   	delta_samples += (Machine->sample_rate / Machine->drv->frames_per_second) - samples_per_frame;
+	if (delta_samples >= 1.0f)
+	{
+		int integer_delta = (int)delta_samples;
+		samples_per_frame += integer_delta;
+		delta_samples -= integer_delta;
+	}
+
+	return samples_per_frame;
 }
 
-//---------------------------------------------------------------------
-//	osd_update_audio_stream
-//---------------------------------------------------------------------
-INT32 osd_update_audio_stream( INT16 *buffer )
+
+
+void osd_stop_audio_stream(void)
 {
-  
-	return 0;
 }
 
 //---------------------------------------------------------------------

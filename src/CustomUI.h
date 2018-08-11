@@ -354,12 +354,14 @@ namespace UI
             Draw();
         }
         else if(k & KEY_A)
-        {			
-			char szRom[255];			
-            int gameIndex = mapRoms[m_vecAvailRomList[iGameSelect]];
-			sprintf(szRom,"Launching ROM %s with Index %d\n",m_vecAvailRomList[iGameSelect].c_str(), gameIndex);
-			svcOutputDebugString(szRom,255);
+        {			 
+            int gameIndex = mapRoms[m_vecAvailRomList[iGameSelect]]; 
+			SDL_SetRenderDrawColor(sdl_render, 0, 0, 0, 255);
+			SDL_RenderClear(sdl_render);
+			DrawText(fntLarge, 500, 300, txtcolor, "Loading ROM.....");
+			SDL_RenderPresent(sdl_render);
             run_game(gameIndex);
+			SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);
             Draw();
         }
         else if(k & KEY_B)
