@@ -20,11 +20,14 @@ UINT32	g_pal32Lookup[65536] = {0};
 int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_components )
 {
   
+	debugload("osd_create_display \n");
 	gfxInitDefault();
 	
 	set_ui_visarea( 0,0,0,0 );
 	
-	if(Machine->color_depth == 15)
+	debugload("set_ui_visarea \n");
+	
+	if(Machine->color_depth == 16)
 	{
       /* 32bpp only */
 		rgb_components[0] = 0x7C00;
@@ -57,8 +60,7 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 		g_createParams.aspect_x = g_createParams.aspect_y;
 		g_createParams.aspect_y = temp;
 	}
-	
-	
+	   
   nx_SetResolution(g_createParams.width,g_createParams.height);
   
   return 0;
@@ -117,18 +119,27 @@ void osd_update_video_and_audio(struct mame_display *display)
          const uint32_t pitch = display->game_bitmap->rowpixels;
 
          // Copy pixels
-         if(display->game_bitmap->depth == 16)
-         {            
+		 
+		 char depth[50];
+		 sprintf(depth,"depth = %d\n", display->game_bitmap->depth);
+		 //svcOutputDebugString(depth);
+		 
+         //if(display->game_bitmap->depth == 16)			
+         {            	
+	 			 	
             const uint16_t* input = &((uint16_t*)display->game_bitmap->base)[y * pitch + x];
 
             for(int i = 0; i < height; i ++)
             {
                for (int j = 0; j < width; j ++)
                {
-					const uint32_t color = display->game_palette[*input++];                												
+					const uint32_t color = g_pal32Lookup[*input++];                												
 					
-					framebuf[(uint32_t) gfxGetFramebufferDisplayOffset((uint32_t) j  , (uint32_t) i  )] = (((color >> 19) & 0x1f) << 11) | (((color >> 11) & 0x1f) << 6) |
-                     ((color >> 3) & 0x1f);
+					unsigned char r = (color >> 16 ) & 0xFF;
+					unsigned char g = (color >> 8 ) & 0xFF;
+					unsigned char b = (color ) & 0xFF;
+					 									
+					framebuf[(uint32_t) gfxGetFramebufferDisplayOffset((uint32_t) j  , (uint32_t) i  )] = RGBA8_MAXALPHA(r,g,b);
 					
                }
 			   
@@ -221,7 +232,7 @@ int nx_SoftRender(	struct mame_bitmap *bitmap,
 		}
 		else if( bitmap->depth == 32 )
 		{
-				svcOutputDebugString("32 bit",20);
+				//svcOutputDebugString("32 bit",20);
 				nx_RenderDirect32( framebuf, bitmap, bounds );
 		}	
 		//else

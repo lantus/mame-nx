@@ -14,7 +14,8 @@
 
 #include <stdio.h>
 #include <stdarg.h>
- 
+
+
 
 //---------------------------------------------------------------------
 //  osd_malloc_debug
@@ -101,7 +102,9 @@ void *osd_realloc_retail( void *memblock, size_t size )
 int osd_display_loading_rom_message( const char *name, struct rom_load_data *romdata )
 {
  
-
+	
+	RenderProgress(name,romdata);
+	
 	return 0;
 }
 
@@ -117,7 +120,7 @@ void osd_pause( int paused )
 //---------------------------------------------------------------------
 void logerror( const char *fmt, ... )
 {
-#ifdef ENABLE_LOGERROR
+ 
   char buf[1024] = {0};
 
   va_list arg;
@@ -125,25 +128,26 @@ void logerror( const char *fmt, ... )
   vsnprintf( buf, 1023, fmt, arg );
   va_end( arg );
 
-	PRINTMSG(( T_ERROR, buf ));
-#endif
+	//PRINTMSG(( T_ERROR, buf ));
+ 
+
+//debugload("error = %s\n",buf);
 }
 
 //---------------------------------------------------------------------
 //	osd_print_error
 //---------------------------------------------------------------------
 void osd_print_error( const char *fmt, ... )
-{
-  wchar_t wBuf[1024];
+{  
   char buf[1024] = {0};
 
   va_list arg;
   va_start( arg, fmt );
   vsnprintf( buf, 1023, fmt, arg );
   va_end( arg );
-
-  mbstowcs( wBuf, buf, 1023 );
-
+ 
+   
+  RenderMessage(buf);
  
 }
 
@@ -166,6 +170,8 @@ void osd_die( const char *fmt, ... )
   va_start( arg, fmt );
   vsnprintf( buf, 1023, fmt, arg );
   va_end( arg );
+  
+  //svcOutputDebugString(buf,1023);
  
 }
 

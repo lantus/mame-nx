@@ -25,6 +25,8 @@
 #ifndef OSD_CPU_H
 #define OSD_CPU_H
 
+#include <stdint.h>
+
 #define PI				3.1415927
 #define M_PI			PI
  
@@ -36,25 +38,15 @@
 #define __extension__
 #endif
 
-//#define strcasecmp stricmp
+typedef uint8_t						UINT8;
+typedef int8_t 						INT8;
+typedef uint16_t					UINT16;
+typedef int16_t						INT16;
+typedef uint32_t					UINT32;
+typedef int32_t						INT32;
+typedef int64_t						INT64;
+typedef uint64_t					UINT64;
 
-
-typedef unsigned char						UINT8;
-typedef signed char 						INT8;
-typedef unsigned short						UINT16;
-typedef signed short						INT16;
-
-#ifndef _WINDOWS_H
-typedef unsigned int						UINT32;
-typedef signed int							INT32;
-#ifdef _MSC_VER
-typedef signed __int64						INT64;
-typedef unsigned __int64					UINT64;
-#else
-__extension__ typedef unsigned long long	UINT64;
-__extension__ typedef signed long long		INT64;
-#endif
-#endif
 
 /* Combine two 32-bit integers into a 64-bit integer */
 #define COMBINE_64_32_32(A,B)     ((((UINT64)(A))<<32) | (UINT32)(B))

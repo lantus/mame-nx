@@ -19,15 +19,15 @@ typedef enum
 	kZippedFile
 }	eFileType;
 
-typedef struct
+
+struct _osd_file
 {
-	FILE *file;
-	unsigned char *data;
-	unsigned int offset;
-	unsigned int length;
-	eFileType type;
-	unsigned int crc;
-}	FakeFileHandle;
+
+    FILE* file;
+
+};
+
+
 
 enum stat_mode
 {
@@ -147,16 +147,14 @@ osd_file *osd_fopen( int pathtype, int pathindex, const char *filename, const ch
     char buffer[256];
     char currDir[256];
 	 
-	FakeFileHandle *f = NULL;
-	 	
-	f = (FakeFileHandle *) malloc(sizeof (FakeFileHandle));
+	osd_file* f = malloc(sizeof(osd_file));
+	 		 
 	if( !f )
 	{
 		logerror("osd_fopen: failed to mallocFakeFileHandle!\n");
         return NULL;
 	}
-	memset (f, 0, sizeof (FakeFileHandle));
-	 
+	 	 
 	osd_get_path(pathtype, currDir);
 	sprintf(buffer, "%s/%s", currDir,  filename);
 	
@@ -197,10 +195,8 @@ void osd_fflush( osd_file *file )
 //---------------------------------------------------------------------
 INT32 osd_fseek( osd_file *file, INT64 offset, int whence )
 {
-	FakeFileHandle *f = (FakeFileHandle *) file;
-	 
-
-	return fseek (f->file, offset, whence);
+ 
+	return fseek (file->file, offset, whence);
 }
 
 //---------------------------------------------------------------------
@@ -208,29 +204,24 @@ INT32 osd_fseek( osd_file *file, INT64 offset, int whence )
 //---------------------------------------------------------------------
 UINT64 osd_ftell( osd_file *file )
 {
-	FakeFileHandle *f = (FakeFileHandle *) file;
-
-	return ftell(f->file);
+	 
+	return ftell(file->file);
 }
 
 //---------------------------------------------------------------------
 //	osd_feof
 //---------------------------------------------------------------------
 int osd_feof( osd_file *file )
-{
-      
-	FakeFileHandle *f = (FakeFileHandle *) file;
-
-	return feof(f->file);   
+{ 
+	return feof(file->file);   
 }
 
 //---------------------------------------------------------------------
 //	osd_fread
 //---------------------------------------------------------------------
 UINT32 osd_fread( osd_file *file, void *buffer, UINT32 length )
-{	
-	FakeFileHandle *f = (FakeFileHandle *) file;
-	return fread (buffer, 1, length, f->file);  
+{		 
+	return fread (buffer, 1, length, file->file);  
 }
 
 //---------------------------------------------------------------------
@@ -238,8 +229,8 @@ UINT32 osd_fread( osd_file *file, void *buffer, UINT32 length )
 //---------------------------------------------------------------------
 UINT32 osd_fwrite( osd_file *file, const void *buffer, UINT32 length )
 {
-	FakeFileHandle *f = (FakeFileHandle *) file;
-	return fwrite (buffer, 1, length, ((FakeFileHandle *) file)->file);
+	 
+	return fwrite (buffer, 1, length, file->file);
 }
 
 //---------------------------------------------------------------------
@@ -247,14 +238,13 @@ UINT32 osd_fwrite( osd_file *file, const void *buffer, UINT32 length )
 //---------------------------------------------------------------------
 void osd_fclose( osd_file *file )
 {
-	FakeFileHandle *f = (FakeFileHandle *) file;
-
-	if (f->file)
+	 
+	if (file->file)
 	{
-		fclose (f->file);
-		f->file = NULL;
-		free(f); 
-		f = NULL;
+		fclose (file->file);
+		file->file = NULL;
+		free(file); 
+		file = NULL;
 	}
   
 }

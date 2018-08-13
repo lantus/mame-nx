@@ -2,6 +2,7 @@
 
 #include "osd_cpu.h"
 #include "osdepend.h"
+#include <time.h>
 
  
 
@@ -10,7 +11,12 @@
 //-------------------------------------------------------------
 cycles_t osd_cycles( void )
 {
-	return svcGetSystemTick();
+	struct timeval t; 
+
+    gettimeofday(&t, 0); 
+
+ 
+    return (t.tv_sec * 1) + (t.tv_usec);
 }	
 
 
@@ -19,7 +25,7 @@ cycles_t osd_cycles( void )
 //-------------------------------------------------------------
 cycles_t osd_cycles_per_second( void )
 {
-	return 19200000;
+	return 1;
 }
 
 //-------------------------------------------------------------
@@ -27,7 +33,7 @@ cycles_t osd_cycles_per_second( void )
 //-------------------------------------------------------------
 cycles_t osd_profiling_ticks( void )
 {
-	return svcGetSystemTick();
+	return osd_cycles();
 }
 
 

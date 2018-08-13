@@ -29,6 +29,9 @@ extern CRomList romList;
 const int GAMESEL_MaxWindowList	= 16;		 
 const int GAMESEL_WindowMiddle = 8;	
 
+SDL_Renderer *menu_render;
+TTF_Font *menuFntLarge;
+
 
 float fGameSelect;
 float fCursorPos;
@@ -355,18 +358,21 @@ namespace UI
         }
         else if(k & KEY_A)
         {			 
-            int gameIndex = mapRoms[m_vecAvailRomList[iGameSelect]]; 
+            int gameIndex = mapRoms[m_vecAvailRomList[iCursorPos]]; 
 			SDL_SetRenderDrawColor(sdl_render, 0, 0, 0, 255);
 			SDL_RenderClear(sdl_render);
-			DrawText(fntLarge, 500, 300, txtcolor, "Loading ROM.....");
-			SDL_RenderPresent(sdl_render);
+			
+			//char debug[255];
+			//sprintf(debug,"Rom %s , iCursorPos %d , gameIndex %d \n", m_vecAvailRomList[iCursorPos].c_str(), iCursorPos, gameIndex);
+			//DrawText(fntLarge, 500, 300, txtcolor, debug);								
+			//SDL_RenderPresent(sdl_render);
+							
             run_game(gameIndex);
 			SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);
             Draw();
         }
         else if(k & KEY_B)
-        {
-            
+        {            
             Draw();
         }
         else if(k & KEY_PLUS || k & KEY_MINUS) Exit();
@@ -398,6 +404,9 @@ namespace UI
         fntLarge = TTF_OpenFont("romfs:/Fonts/NintendoStandard.ttf", 25);
         fntMedium = TTF_OpenFont("romfs:/Fonts/NintendoStandard.ttf", 20);
         fntSmall = TTF_OpenFont("romfs:/Fonts/NintendoStandard.ttf", 10);
+		
+		menuFntLarge = fntLarge;
+		
         sdls_Back = InitSurface(Back);
         sdlt_Back = InitTexture(sdls_Back);
         options.push_back("Playable ROM(s)");
@@ -426,6 +435,8 @@ namespace UI
 		selGreen = 0;
 		selBlue = 0;
 		selAlpha = 255;		
+		
+		menu_render = sdl_render;
 		
         Draw();
     }
