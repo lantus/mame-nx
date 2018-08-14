@@ -3,14 +3,36 @@
 #include "CustomUI.h"
 #include "nx_RomList.h"
 
+extern "C" {
+#include "osd_cpu.h"
+#include "driver.h"
+#include "mame.h"
+ 
+}
+
 CRomList romList;	
  
 int main()
 {	
 	romList.InitRomList();
 	romList.RefreshRomList();
-	
+	 
 	UI::Init();
+	
+	
+	options.samplerate = 44100;
+	options.use_samples = true;
+	
+	options.use_filter = true;
+	
+	options.brightness = 1.0f;
+	options.pause_bright = 0.65f;
+	options.gamma = 1.0f;
+	options.color_depth = 0;
+	
+	options.use_artwork = ARTWORK_USE_BACKDROPS | ARTWORK_USE_OVERLAYS | ARTWORK_USE_BEZELS;
+	options.artwork_res = 0;
+	options.artwork_crop = false;	
 	
     while(appletMainLoop())
     {

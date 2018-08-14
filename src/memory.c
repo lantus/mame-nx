@@ -949,7 +949,7 @@ void populate_table(struct memport_data *memport, int iswrite, offs_t start, off
 
 void *assign_dynamic_bank(int cpunum, offs_t start)
 {
-	int bank;
+	FPTR bank;
 
 	/* special case: never assign a dynamic bank to an offset that */
 	/* intersects the CPU's region; always use RAM for that */
@@ -1113,9 +1113,15 @@ static int init_memport(int cpunum, struct memport_data *data, int abits, int db
 	data->ebits = abits - DATABITS_TO_SHIFT(dbits);
 	data->mask = 0xffffffffUL >> (32 - abits);
 
-	/* allocate memory */
+#ifdef SWITCH  
+	data->read.table = malloc(1024*1024);
+	data->write.table = malloc(1024*1024);
+#else
 	data->read.table = malloc(1 << LEVEL1_BITS(data->ebits));
 	data->write.table = malloc(1 << LEVEL1_BITS(data->ebits));
+#endif
+
+
 	if (!data->read.table)
 		return fatalerror("cpu #%d couldn't allocate read table\n", cpunum);
 	if (!data->write.table)

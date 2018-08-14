@@ -72,7 +72,7 @@ namespace UI
     static int Opt1X = 55;
     static int Opt1Y = 275;
 
-    static vector<string> options;
+    static vector<string> optionsvec;
     static int selected = 0;
     static vector<string> foptions;
     static int fselected = 0;
@@ -155,7 +155,7 @@ namespace UI
      
         int ox = Opt1X;
         int oy = Opt1Y;
-        for(int i = 0; i < options.size(); i++)
+        for(int i = 0; i < optionsvec.size(); i++)
         {
             if(i == selected)
             {
@@ -194,7 +194,7 @@ namespace UI
 					dr = 0; dg = 0; db = -1;
 				} 
 				
-                DrawText(fntLarge, ox, oy, { 140, 255, 255, 255 }, options[i].c_str());
+                DrawText(fntLarge, ox, oy, { 140, 255, 255, 255 }, optionsvec[i].c_str());
                 
 				if(i == 0)
                 {
@@ -235,7 +235,7 @@ namespace UI
                    
                 }
             }
-            else DrawText(fntLarge, ox, oy, txtcolor, options[i].c_str());
+            else DrawText(fntLarge, ox, oy, txtcolor, optionsvec[i].c_str());
             oy += 50;
         }
         DrawText(fntLarge, TitleX, 672, txtcolor, RomCountText);
@@ -336,7 +336,7 @@ namespace UI
         if(k & KEY_LSTICK_UP)
         {
             if(selected > 0) selected -= 1;
-            else selected = options.size() - 1;
+            else selected = optionsvec.size() - 1;
             Draw();
         }
         else if(k & KEY_LSTICK_DOWN)
@@ -367,6 +367,16 @@ namespace UI
 			//DrawText(fntLarge, 500, 300, txtcolor, debug);								
 			//SDL_RenderPresent(sdl_render);
 							
+			options.ui_orientation = drivers[gameIndex]->flags & ORIENTATION_MASK;
+
+			if( options.ui_orientation & ORIENTATION_SWAP_XY )
+			{
+		   
+				if( (options.ui_orientation & ROT180) == ORIENTATION_FLIP_X ||
+					(options.ui_orientation & ROT180) == ORIENTATION_FLIP_Y)
+				options.ui_orientation ^= ROT180;
+			}
+			
             run_game(gameIndex);
 			SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);
             Draw();
@@ -409,10 +419,10 @@ namespace UI
 		
         sdls_Back = InitSurface(Back);
         sdlt_Back = InitTexture(sdls_Back);
-        options.push_back("Playable ROM(s)");
-        options.push_back("Options");
-		options.push_back("About mame-nx");
-		options.push_back("Quit");
+        optionsvec.push_back("Playable ROM(s)");
+        optionsvec.push_back("Options");
+		optionsvec.push_back("About mame-nx");
+		optionsvec.push_back("Quit");
          
 		sprintf(RomCountText,"%d/%d Games Found",romList.AvRoms(), romList.totalMAMEGames);	 
 		
