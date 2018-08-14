@@ -1,6 +1,8 @@
- 
+#include <stdio.h>
 #include "osd_cpu.h"
 #include "osdepend.h"
+ 
+static int g_systemInitialized = 0;
  
 const struct KeyboardInfo nxKeys[] =
 {
@@ -12,7 +14,12 @@ const struct KeyboardInfo nxKeys[] =
 //---------------------------------------------------------------------
 void osd_customize_inputport_defaults( struct ipd *defaults )
 {
-	 
+
+  if( g_systemInitialized == 0)
+  {
+    nxInitializeJoystick();
+    g_systemInitialized = 1;
+  }	 
 }
 
  

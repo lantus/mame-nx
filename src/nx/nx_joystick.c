@@ -3,58 +3,96 @@
 
 #include "osd_cpu.h"
 #include "osdepend.h"
+#include "osd_cpu.h"
+#include "osdepend.h"
+#include "inptport.h"
  
-#define RETRO_DEVICE_ID_JOYPAD_B        0
-#define RETRO_DEVICE_ID_JOYPAD_Y        1
-#define RETRO_DEVICE_ID_JOYPAD_SELECT   2
-#define RETRO_DEVICE_ID_JOYPAD_START    3
-#define RETRO_DEVICE_ID_JOYPAD_UP       4
-#define RETRO_DEVICE_ID_JOYPAD_DOWN     5
-#define RETRO_DEVICE_ID_JOYPAD_LEFT     6
-#define RETRO_DEVICE_ID_JOYPAD_RIGHT    7
-#define RETRO_DEVICE_ID_JOYPAD_A        8
-#define RETRO_DEVICE_ID_JOYPAD_X        9
-#define RETRO_DEVICE_ID_JOYPAD_L       10
-#define RETRO_DEVICE_ID_JOYPAD_R       11
-#define RETRO_DEVICE_ID_JOYPAD_L2      12
-#define RETRO_DEVICE_ID_JOYPAD_R2      13
-#define RETRO_DEVICE_ID_JOYPAD_L3      14
-#define RETRO_DEVICE_ID_JOYPAD_R3      15 
+static struct JoystickInfo		g_joystickInfo[4] = {0};
+static UINT32                   g_calibrationStep = 0;
+static UINT32                   g_calibrationJoynum = 0;
  
-#define EMIT_NX_PAD(INDEX) \
-    {"RetroPad" #INDEX " Left", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_LEFT, JOYCODE_##INDEX##_LEFT}, \
-    {"RetroPad" #INDEX " Right", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_RIGHT, JOYCODE_##INDEX##_RIGHT}, \
-    {"RetroPad" #INDEX " Up", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_UP, JOYCODE_##INDEX##_UP}, \
-    {"RetroPad" #INDEX " Down", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_DOWN, JOYCODE_##INDEX##_DOWN}, \
-    {"RetroPad" #INDEX " B", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_B, JOYCODE_##INDEX##_BUTTON1}, \
-    {"RetroPad" #INDEX " Y", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_Y, JOYCODE_##INDEX##_BUTTON2}, \
-    {"RetroPad" #INDEX " X", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_X, JOYCODE_##INDEX##_BUTTON3}, \
-    {"RetroPad" #INDEX " A", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_A, JOYCODE_##INDEX##_BUTTON4}, \
-    {"RetroPad" #INDEX " L", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_L, JOYCODE_##INDEX##_BUTTON5}, \
-    {"RetroPad" #INDEX " R", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_R, JOYCODE_##INDEX##_BUTTON6}, \
-    {"RetroPad" #INDEX " L2", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_L2, JOYCODE_##INDEX##_BUTTON7}, \
-    {"RetroPad" #INDEX " R2", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_R2, JOYCODE_##INDEX##_BUTTON8}, \
-    {"RetroPad" #INDEX " L3", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_L3, JOYCODE_##INDEX##_BUTTON9}, \
-    {"RetroPad" #INDEX " R3", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_R3, JOYCODE_##INDEX##_BUTTON10}, \
-    {"RetroPad" #INDEX " Start", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_START, JOYCODE_##INDEX##_START}, \
-    {"RetroPad" #INDEX " Select", ((INDEX - 1) * 18) + RETRO_DEVICE_ID_JOYPAD_SELECT, JOYCODE_##INDEX##_SELECT}
+UINT32					g_numOSDInputKeywords;
 
-struct JoystickInfo jsItems[] =
+
+#define JOYNAME( _string__ )  				sprintf( name, "J%d %s", stickIndex + 1, _string__ )
+#define BEGINENTRYMAP()                  	UINT32 joycount = 0
+#define ADDENTRY( _name__, _code__, _standardCode__ )    JOYNAME( _name__ ); nxAddEntry( name, (_code__), (_standardCode__), &joycount )
+#define STDCODE( cde )    					(stickIndex == 0 ? JOYCODE_1_##cde : (stickIndex == 1 ? JOYCODE_2_##cde : (stickIndex == 2 ? JOYCODE_3_##cde : JOYCODE_4_##cde )))
+#define JOYCODE(joy, type, index)	      	((index) | ((type) << 8) | ((joy) << 12))
+#define JOYINDEX(joycode)			        ((joycode) & 0xff)
+#define JT(joycode)			                (((joycode) >> 8) & 0xf)
+#define JOYNUM(joycode)				        (((joycode) >> 12) & 0xf)
+#define AXISCODE( _stick__, _axis__ )   	joyoscode_to_code( JOYCODE( _stick__, _axis__, 0 ) )
+#define BUTTONCODE( _stick__, _ID__ )   	joyoscode_to_code( JOYCODE( _stick__, JT_BUTTON, _ID__ ) )
+ 
+	 
+typedef enum NXJoyType {
+	KEY_A = 0, KEY_B, KEY_X, KEY_Y,
+    KEY_LSTICK, KEY_RSTICK,
+    KEY_L, KEY_R,
+    KEY_ZL, KEY_ZR,
+    KEY_PLUS, KEY_MINUS,
+    KEY_DLEFT, KEY_DUP, KEY_DRIGHT, KEY_DDOWN,
+    KEY_LSTICK_LEFT, KEY_LSTICK_UP, KEY_LSTICK_RIGHT, KEY_LSTICK_DOWN,
+    KEY_RSTICK_LEFT, KEY_RSTICK_UP, KEY_RSTICK_RIGHT, KEY_RSTICK_DOWN, JT_BUTTON
+} NXJoyType;
+ 
+void nxInitializeJoystick( void )
 {
-    EMIT_NX_PAD(1),
-    EMIT_NX_PAD(2),
-    {0, 0, 0}
-};
+	BEGINENTRYMAP();
+	INT32 stickIndex = 0;
 
+	for( ; stickIndex < 4; ++stickIndex )
+	{
+    char name[32];
  
+      // DPad
+    ADDENTRY( "DPAD UP",      JOYCODE( stickIndex, KEY_DUP, 0 ),        STDCODE( UP ) );
+    ADDENTRY( "DPAD RIGHT",   JOYCODE( stickIndex, KEY_DRIGHT , 0 ),    STDCODE( RIGHT ) );
+    ADDENTRY( "DPAD DOWN",    JOYCODE( stickIndex, KEY_DDOWN, 0 ),      STDCODE( DOWN ) );
+    ADDENTRY( "DPAD LEFT",    JOYCODE( stickIndex, KEY_DLEFT , 0 ),     STDCODE( LEFT ) );
 
+      // Left analog
+    AXISCODE( stickIndex, KEY_LSTICK_UP );
+    AXISCODE( stickIndex, KEY_LSTICK_RIGHT );
+    AXISCODE( stickIndex, KEY_LSTICK_DOWN );
+    AXISCODE( stickIndex, KEY_LSTICK_LEFT );
+    ADDENTRY( "LA UP",        JOYCODE( stickIndex, KEY_LSTICK_UP, 0 ),     CODE_OTHER );
+    ADDENTRY( "LA RIGHT",     JOYCODE( stickIndex, KEY_LSTICK_RIGHT , 0 ), CODE_OTHER );
+    ADDENTRY( "LA DOWN",      JOYCODE( stickIndex, KEY_LSTICK_DOWN, 0 ),   CODE_OTHER );
+    ADDENTRY( "LA LEFT",      JOYCODE( stickIndex, KEY_LSTICK_LEFT , 0 ),  CODE_OTHER );
+
+      // Right analog
+    AXISCODE( stickIndex, KEY_RSTICK_UP );
+    AXISCODE( stickIndex, KEY_RSTICK_RIGHT );
+    AXISCODE( stickIndex, KEY_RSTICK_DOWN );
+    AXISCODE( stickIndex, KEY_RSTICK_LEFT );
+    ADDENTRY( "RA UP",        JOYCODE( stickIndex, KEY_RSTICK_UP, 0 ),     CODE_OTHER );
+    ADDENTRY( "RA RIGHT",     JOYCODE( stickIndex, KEY_RSTICK_RIGHT , 0 ), CODE_OTHER );
+    ADDENTRY( "RA DOWN",      JOYCODE( stickIndex, KEY_RSTICK_DOWN, 0 ),   CODE_OTHER );
+    ADDENTRY( "RA LEFT",      JOYCODE( stickIndex, KEY_RSTICK_LEFT , 0 ),  CODE_OTHER );
+
+      // Buttons
+ 
+    ADDENTRY( "A",            JOYCODE( stickIndex, 8, KEY_A ),              STDCODE( BUTTON1 ) );
+    ADDENTRY( "X",            JOYCODE( stickIndex, 8, KEY_X ),              STDCODE( BUTTON2 ) );
+    ADDENTRY( "B",            JOYCODE( stickIndex, 8, KEY_B ),              STDCODE( BUTTON3 ) );
+    ADDENTRY( "Y",            JOYCODE( stickIndex, 8, KEY_Y ),              STDCODE( BUTTON4 ) );
+    ADDENTRY( "LTrig",        JOYCODE( stickIndex, 8, KEY_L ),   			STDCODE( BUTTON5 ) );
+    ADDENTRY( "RTrig",        JOYCODE( stickIndex, 8, KEY_R ),  			STDCODE( BUTTON6 ) );
+    ADDENTRY( "Plus",         JOYCODE( stickIndex, 8, KEY_PLUS ),          	STDCODE( START ) );
+    ADDENTRY( "Minus",        JOYCODE( stickIndex, 8, KEY_MINUS ),       	STDCODE( SELECT ) );
+
+  }
+}
+ 
+ 
 //---------------------------------------------------------------------
 //	osd_get_joy_list
 //---------------------------------------------------------------------
 const struct JoystickInfo *osd_get_joy_list( void )
-{
-  
-	return jsItems;
+{  
+	return g_joystickInfo;
 }
 
 //---------------------------------------------------------------------
@@ -62,8 +100,34 @@ const struct JoystickInfo *osd_get_joy_list( void )
 //---------------------------------------------------------------------
 int osd_is_joy_pressed( int joycode )
 {
- 
+	int32_t joyindex = JOYINDEX(joycode);
+	int32_t joytype = JT(joycode);
+	int32_t joynum = JOYNUM(joycode);
+
+	hidScanInput();
+	uint64_t buttons = hidKeysHeld(10);
 	
+	 
+	switch( joytype )
+	{
+		case 8: 
+			return (buttons & joyindex);		 
+			break;
+/*
+		case KEY_DUP:
+			return (gamepad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
+		case KEY_DOWN:
+			return (gamepad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
+		case KEY_LEFT:
+			return (gamepad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
+		case KEY_RIGHT:
+			return (gamepad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);*/
+
+	 
+
+	}
+	
+	 
 	return 0;
 }
 
@@ -149,5 +213,47 @@ void osd_analogjoy_read(	int player,
 }
  
  
+void nxAddEntry( const char *name, INT32 code, INT32 standardCode, UINT32 *joycount )
+{
+	struct JoystickInfo *ji = NULL;
+	struct ik *inputkeywords;
+  
+	ji = &g_joystickInfo[*joycount];
 
+	ji->name = strdup( name );
+	if( !ji->name )
+	{	 
+		osd_print_error( "Out of memory!" );
+		return;
+	}
 
+    // Convert spaces in ji->name to '_'
+	{
+		char *cur = ji->name;
+		while( *cur )
+		{
+			if( *cur == ' ' )
+			*cur = '_';
+		++cur;
+		}
+	}
+
+	ji->code = code;
+	ji->standardcode = standardCode;
+
+    // Reallocate the osd_input_keywords array, and add the new entry
+	inputkeywords = (struct ik*)osd_realloc_retail( osd_input_keywords, (g_numOSDInputKeywords + 2) * sizeof(struct ik) );
+	if( inputkeywords )
+	{
+		osd_input_keywords = inputkeywords;
+		osd_input_keywords[g_numOSDInputKeywords].name = ji->name;  // Just share the value
+		osd_input_keywords[g_numOSDInputKeywords].type = IKT_OSD_JOY;
+		osd_input_keywords[g_numOSDInputKeywords].val = code;
+		++g_numOSDInputKeywords;
+
+      // Tag the end of the list
+		osd_input_keywords[g_numOSDInputKeywords].name = NULL;
+		++(*joycount);
+	}
+}
+  
