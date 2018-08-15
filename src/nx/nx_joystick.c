@@ -7,11 +7,11 @@
 #include "osdepend.h"
 #include "inptport.h"
  
-static struct JoystickInfo		g_joystickInfo[4] = {0};
+static struct JoystickInfo		g_joystickInfo[128] = {0,0,0};
 static UINT32                   g_calibrationStep = 0;
 static UINT32                   g_calibrationJoynum = 0;
  
-UINT32					g_numOSDInputKeywords;
+UINT32							g_numOSDInputKeywords;
 
 
 #define JOYNAME( _string__ )  				sprintf( name, "J%d %s", stickIndex + 1, _string__ )
@@ -42,7 +42,7 @@ void nxInitializeJoystick( void )
 	BEGINENTRYMAP();
 	INT32 stickIndex = 0;
 
-	for( ; stickIndex < 4; ++stickIndex )
+	for( ; stickIndex < 1; ++stickIndex )
 	{
     char name[32];
  
@@ -92,6 +92,9 @@ void nxInitializeJoystick( void )
 //---------------------------------------------------------------------
 const struct JoystickInfo *osd_get_joy_list( void )
 {  
+	 
+	
+	
 	return g_joystickInfo;
 }
 
@@ -137,6 +140,8 @@ int osd_is_joy_pressed( int joycode )
 //---------------------------------------------------------------------
 int osd_is_joystick_axis_code( int joycode )
 {
+	
+	
  
 	return 0;
 }
@@ -241,19 +246,6 @@ void nxAddEntry( const char *name, INT32 code, INT32 standardCode, UINT32 *joyco
 	ji->code = code;
 	ji->standardcode = standardCode;
 
-    // Reallocate the osd_input_keywords array, and add the new entry
-	inputkeywords = (struct ik*)osd_realloc_retail( osd_input_keywords, (g_numOSDInputKeywords + 2) * sizeof(struct ik) );
-	if( inputkeywords )
-	{
-		osd_input_keywords = inputkeywords;
-		osd_input_keywords[g_numOSDInputKeywords].name = ji->name;  // Just share the value
-		osd_input_keywords[g_numOSDInputKeywords].type = IKT_OSD_JOY;
-		osd_input_keywords[g_numOSDInputKeywords].val = code;
-		++g_numOSDInputKeywords;
-
-      // Tag the end of the list
-		osd_input_keywords[g_numOSDInputKeywords].name = NULL;
-		++(*joycount);
-	}
+	++(*joycount);
 }
   
