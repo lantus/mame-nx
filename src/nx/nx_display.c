@@ -71,7 +71,8 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 //---------------------------------------------------------------------
 void osd_close_display(void)
 {
- 
+	gfxInitDefault();
+	nx_SetResolution(1280,720);
 }
 
 //---------------------------------------------------------------------

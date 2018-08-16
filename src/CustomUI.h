@@ -361,12 +361,7 @@ namespace UI
             int gameIndex = mapRoms[m_vecAvailRomList[iCursorPos]]; 
 			SDL_SetRenderDrawColor(sdl_render, 0, 0, 0, 255);
 			SDL_RenderClear(sdl_render);
-			
-			//char debug[255];
-			//sprintf(debug,"Rom %s , iCursorPos %d , gameIndex %d \n", m_vecAvailRomList[iCursorPos].c_str(), iCursorPos, gameIndex);
-			//DrawText(fntLarge, 500, 300, txtcolor, debug);								
-			//SDL_RenderPresent(sdl_render);
-							
+		 
 			options.ui_orientation = drivers[gameIndex]->flags & ORIENTATION_MASK;
 
 			if( options.ui_orientation & ORIENTATION_SWAP_XY )
@@ -378,6 +373,7 @@ namespace UI
 			}
 			
             run_game(gameIndex);
+			svcOutputDebugString("game exited",20);
 			SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);
             Draw();
         }

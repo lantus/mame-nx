@@ -118,6 +118,19 @@ int osd_update_audio_stream(INT16 *buffer)
 
 void osd_stop_audio_stream(void)
 {
+	 	
+	if (audioPtr)
+	{
+		 
+		audoutStopAudioOut();
+		audoutExit();
+
+		for (int i = 0; i < 2; i++)
+			  free(audioPtr->source_buffer[i].buffer);
+
+		free(audioPtr);
+		audioPtr = NULL;
+	}		
 }
 
 //---------------------------------------------------------------------
