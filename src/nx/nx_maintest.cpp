@@ -20,7 +20,7 @@ int main()
 	UI::Init();
 	
 	
-	options.samplerate = 22050;
+	options.samplerate = 48000;
 	options.use_samples = true;
 	
 	options.use_filter = true;

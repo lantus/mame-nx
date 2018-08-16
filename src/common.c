@@ -965,7 +965,6 @@ void CLIB_DECL debugload(const char *string, ...)
 		fclose(f);
 	}
  
- 
 }
 
 
@@ -1205,11 +1204,25 @@ static int display_rom_load_results(struct rom_load_data *romdata)
 			strcat(romdata->errorbuf, "WARNING: the game might not run correctly.\n");
 
 		/* display the result */
-		printf("%s", romdata->errorbuf);
-        osd_print_error( "%s", romdata->errorbuf );
+		osd_print_error("%s", romdata->errorbuf);
 
 		/* if we're not getting out of here, wait for a keypress */
-		 
+		if (!options.gui_host && !bailing)
+		{
+			int k;
+
+			/* loop until we get one */
+			osd_print_error ("Press any key to continue\n");
+			do
+			{
+				k = code_read_async();
+			}
+			while (k == CODE_NONE || k == KEYCODE_LCONTROL);
+
+			/* bail on a control + C */
+			if (keyboard_pressed(KEYCODE_LCONTROL) && keyboard_pressed(KEYCODE_C))
+				return 1;
+		}
 	}
 
 	/* clean up any regions */
@@ -1624,12 +1637,10 @@ static int process_rom_entries(struct rom_load_data *romdata, const struct RomMo
 			}
 		}
 	}
-	 
 	return 1;
 
 	/* error case */
 fatalerror:
-	 
 	if (romdata->file)
 		mame_fclose(romdata->file);
 	romdata->file = NULL;
@@ -1836,13 +1847,12 @@ int rom_load(const struct RomModule *romp)
 
 		/* now process the entries in the region */
 		if (ROMREGION_ISROMDATA(region))
-		{			 
+		{
 			if (!process_rom_entries(&romdata, region + 1))
 				return 1;
 		}
 		else if (ROMREGION_ISDISKDATA(region))
 		{
-			svcOutputDebugString("disk entries",20);
 			if (!process_disk_entries(&romdata, region + 1))
 				return 1;
 		}

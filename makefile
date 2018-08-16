@@ -146,7 +146,7 @@ OBJ = obj/$(NAME)
 
 EMULATOR = $(BINDIR)/$(NAME).elf
 
-DEFS = -DALIGN_SHORTS -DALIGN_INTS -DLSB_FIRST -DINLINE="static __inline__" -DSWITCH
+DEFS = -DLSB_FIRST -DINLINE="static __inline__" -DSWITCH
 
 CFLAGS = -std=gnu99 -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
 CXXFLAGS = -std=gnu99 -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
@@ -165,17 +165,12 @@ ifdef SYMBOLS
 CFLAGS += -O0 -Wall -Werror -Wno-unused -g
 else
 CFLAGS += -DNDEBUG \
-	$(ARCH) -w -O3 -fomit-frame-pointer -fstrict-aliasing \
-	-Wall -Wno-sign-compare -Wunused \
-	-Wpointer-arith -Wbad-function-cast -Wcast-align -Waggregate-return \
-	-Wshadow -Wstrict-prototypes -Wundef \
-	-Wformat-security -Wwrite-strings \
-	-Wdisabled-optimization \
-	-Wno-sizeof-pointer-memaccess \
-	-mtune=cortex-a57 -mtp=soft -fPIE -fomit-frame-pointer
+	$(ARCH) -w -O2 \
+	-Wall \
+	-mtune=cortex-a57 -mtp=soft -fPIE
 endif
 
-CFLAGSPEDANTIC = $(CFLAGS) -pedantic
+CFLAGSPEDANTIC = $(CFLAGS)
 
 ifdef SYMBOLS
 LDFLAGS =
@@ -191,7 +186,7 @@ MAPFLAGS =
 endif
 
 # platform .mak files will want to add to this
-LIBS = -lfreetype -lSDL2_ttf -lSDL2_gfx -lSDL2_image -lpng -ljpeg `sdl2-config --libs` `freetype-config --libs` -lz -lnx -lm
+LIBS = -lfreetype -lSDL2_ttf -lSDL2_gfx -lSDL2_image -lpng -ljpeg `sdl2-config --libs` `freetype-config --libs` -lz -lm -lnx
 
 OBJDIRS = obj $(OBJ) $(OBJ)/cpu $(OBJ)/sound $(OBJ)/$(MAMEOS) \
 	$(OBJ)/drivers $(OBJ)/machine $(OBJ)/vidhrdw $(OBJ)/sndhrdw

@@ -106,8 +106,12 @@ static unsigned accum_base;
 static int left_accum[ACCUMULATOR_SAMPLES];
 static int right_accum[ACCUMULATOR_SAMPLES];
 
+#ifdef SWITCH
 /* 16-bit mix buffers */
-static INT16 mix_buffer[ACCUMULATOR_SAMPLES*2]; /* *2 for stereo */
+static INT16 mix_buffer[ACCUMULATOR_SAMPLES*2] __attribute__ ((aligned(0x1000))); /* *2 for stereo */
+#else
+static INT16 mix_buffer[ACCUMULATOR_SAMPLES*2] /* *2 for stereo */
+#endif
 
 /* global sample tracking */
 static unsigned samples_this_frame;

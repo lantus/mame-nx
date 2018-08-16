@@ -402,7 +402,7 @@ namespace UI
         Back = "romfs:/Graphics/mamelogo-nx.png";
         txtcolor = { 255, 255, 255, 255 };
         setsysExit();
-        SDL_Init(SDL_INIT_EVERYTHING);
+        SDL_Init(SDL_INIT_VIDEO|SDL_INIT_JOYSTICK);
         SDL_CreateWindowAndRenderer(1280, 720, 0, &sdl_wnd, &sdl_render);
         sdl_surf = SDL_GetWindowSurface(sdl_wnd);
         SDL_SetRenderDrawBlendMode(sdl_render, SDL_BLENDMODE_BLEND);
