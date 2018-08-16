@@ -232,6 +232,15 @@ namespace UI
                 }
                 else if(i == 1)
                 {
+					DrawText(fntLarge, 475, 200, txtcolor, "No Options - Yet");
+                     
+                }
+				else if(i == 2)
+                {
+                   
+                }
+				else if(i == 3)
+                {
                    
                 }
             }
@@ -247,16 +256,8 @@ namespace UI
 		hidScanInput();
         int k = hidKeysDown(CONTROLLER_P1_AUTO);
         int h = hidKeysHeld(CONTROLLER_P1_AUTO);
-        if(h & KEY_DUP)
-        {            
-            Draw();
-        }
-        else if(h & KEY_DDOWN)
-        {
-             
-            Draw();       
-		}
-		else if(h & KEY_ZL)
+        
+		if(h & KEY_ZL || k & KEY_DUP)
         {
 			// default don`t clamp cursor
 			bool bClampCursor =	false;
@@ -291,7 +292,7 @@ namespace UI
 
 			Draw();
         }
-        else if(h & KEY_ZR)
+        else if(h & KEY_ZR || k & KEY_DDOWN)
         {
  
 			// default don`t clamp cursor
@@ -342,8 +343,9 @@ namespace UI
         else if(k & KEY_LSTICK_DOWN)
         {
            
-
-			 Draw();
+			if(selected < optionsvec.size() - 1) selected += 1;
+            else selected = 0;
+            Draw();
         }
         
         else if(k & KEY_X)
@@ -383,6 +385,9 @@ namespace UI
         }
         else if(k & KEY_PLUS || k & KEY_MINUS) Exit();
     }
+	
+ 
+	
 
     void Init()
     {
