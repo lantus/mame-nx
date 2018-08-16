@@ -3,19 +3,10 @@
 #include "osd_cpu.h"
 #include "driver.h"
  
-#include <switch/audio/audio.h>
-#include <switch/services/audout.h>
-
-#define R_FAILED(res) ((res)<0)
-
-static float delta_samples;
+#include <switch.h>
+  
 int samples_per_frame = 0;
-short *samples_buffer;
-short *conversion_buffer;
-int usestereo = 1;
-
-
-
+  
 #define SAMPLERATE 48000
 #define CHANNELCOUNT 2
 #define FRAMERATE (1000 / 60)
@@ -23,57 +14,53 @@ int usestereo = 1;
 #define BYTESPERSAMPLE sizeof(uint16_t)
  
 typedef struct nxAudioData
-{
-    void *buffer[2];
+{     
     AudioOutBuffer source_buffer[2];
     AudioOutBuffer *released_buffer;
     uint32_t released_count;
 
 } nxAudioData; 
-
-
-
+ 
 static uint32_t audio_data_size()
 {
       return (SAMPLECOUNT * CHANNELCOUNT * BYTESPERSAMPLE);
 }
 
 static size_t audio_buffer_size(void *data)
-{
-      (void)data;
+{      
       return (audio_data_size() + 0xfff) & ~0xfff;
 }
  
 nxAudioData *audioPtr = NULL;
  
 int osd_start_audio_stream(int stereo)
-{
-	delta_samples = 0.0f;
-	usestereo = stereo ? 1 : 0;
- 
-	/* determine the number of samples per frame */
-	samples_per_frame = Machine->sample_rate / Machine->drv->frames_per_second;
- 
+{	 
+
 	if (Machine->sample_rate == 0) return 0;
+	
+	/* determine the number of samples per frame */
+	samples_per_frame = Machine->sample_rate / Machine->drv->frames_per_second;	
 	
 	audoutInitialize();	
 	audoutStartAudioOut();
 	
-	audioPtr = (struct nxAudioData *)malloc(sizeof(nxAudioData));
+	if (!audioPtr)
+	{
+		audioPtr = (struct nxAudioData *)calloc(1,sizeof(*audioPtr));
 	
-	for (int i = 0; i < 2; i++) {
-         
-        audioPtr->buffer[i] = memalign(0x1000, audio_buffer_size(NULL));
-        memset(audioPtr->buffer[i], 0, audio_buffer_size(NULL));
-        audioPtr->source_buffer[i].next = NULL;
-        audioPtr->source_buffer[i].buffer = audioPtr->buffer[i];
-        audioPtr->source_buffer[i].buffer_size = audio_buffer_size(NULL);
-        audioPtr->source_buffer[i].data_size = audio_data_size();
-        audioPtr->source_buffer[i].data_offset = 0;
-        audoutAppendAudioOutBuffer(&audioPtr->source_buffer[i]);
-    }	
+		for (int i = 0; i < 2; i++) {
+			  
+			audioPtr->source_buffer[i].next = NULL;
+			audioPtr->source_buffer[i].buffer = aligned_alloc(0x1000, audio_buffer_size(NULL));
+			audioPtr->source_buffer[i].buffer_size = audio_buffer_size(NULL);
+			audioPtr->source_buffer[i].data_size = audio_data_size();
+			audioPtr->source_buffer[i].data_offset = 0;
+			memset(audioPtr->source_buffer[i].buffer,0x00,audio_buffer_size(NULL));
+			audoutAppendAudioOutBuffer(&audioPtr->source_buffer[i]);
+		}	
 	
-	audioPtr->released_buffer = NULL;
+		audioPtr->released_buffer = NULL;
+	}
 	
 	return samples_per_frame;
 
@@ -84,6 +71,7 @@ int osd_update_audio_stream(INT16 *buffer)
 {	 
 	 
 	int samplerate_buffer_size = (Machine->sample_rate / Machine->drv->frames_per_second);
+	
 
 	if (!audioPtr->released_buffer)
     {
@@ -105,8 +93,7 @@ int osd_update_audio_stream(INT16 *buffer)
  
 								 
 		}
-		 
-		
+		 		
 		audioPtr->released_buffer->data_size = 0;
 								
 	}
