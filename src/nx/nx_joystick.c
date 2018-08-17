@@ -10,7 +10,7 @@
 
 #include <switch.h>
  
-#define ANALOG_AS_DIGITAL_DEADZONE	8000
+#define ANALOG_AS_DIGITAL_DEADZONE	100
  
 static struct JoystickInfo		g_joystickInfo[128] = {0,0,0};
 static UINT32                   g_calibrationStep = 0;
@@ -69,8 +69,8 @@ void nxInitializeJoystick( void )
     BUTTONCODE( stickIndex, BUTTON_ZL );
     BUTTONCODE( stickIndex, BUTTON_ZR );
     ADDENTRY( "A",            JOYCODE( stickIndex, JT_BUTTON, BUTTON_A ),              STDCODE( BUTTON1 ) );
-    ADDENTRY( "X",            JOYCODE( stickIndex, JT_BUTTON, BUTTON_X ),              STDCODE( BUTTON2 ) );
-    ADDENTRY( "B",            JOYCODE( stickIndex, JT_BUTTON, BUTTON_B ),              STDCODE( BUTTON3 ) );
+    ADDENTRY( "B",            JOYCODE( stickIndex, JT_BUTTON, BUTTON_B ),              STDCODE( BUTTON2 ) );
+    ADDENTRY( "X",            JOYCODE( stickIndex, JT_BUTTON, BUTTON_X ),              STDCODE( BUTTON3 ) );
     ADDENTRY( "Y",            JOYCODE( stickIndex, JT_BUTTON, BUTTON_Y ),              STDCODE( BUTTON4 ) );
     ADDENTRY( "LTrig",        JOYCODE( stickIndex, JT_BUTTON, BUTTON_LEFT_TRIGGER ),   STDCODE( BUTTON5 ) );
     ADDENTRY( "RTrig",        JOYCODE( stickIndex, JT_BUTTON, BUTTON_RIGHT_TRIGGER ),  STDCODE( BUTTON6 ) );

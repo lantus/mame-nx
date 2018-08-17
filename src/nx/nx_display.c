@@ -11,6 +11,8 @@
 static INT32 frameCount = 0;
 static float g_desiredFPS = 0.0f;
 static struct osd_create_params		g_createParams = {0};
+int offsetx, offsety;
+int newx, newy;
 
 UINT32	g_pal32Lookup[65536] = {0};
 
@@ -60,8 +62,34 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 		g_createParams.aspect_x = g_createParams.aspect_y;
 		g_createParams.aspect_y = temp;
 	}
-	   
-  nx_SetResolution(g_createParams.width,g_createParams.height);
+	
+				
+	const float vidScrnAspect = (float)1280.0 / 720.0;
+	const float gameAspect = (float)g_createParams.aspect_x/g_createParams.aspect_y;
+	
+	float newWidth, newHeight;
+	
+	newWidth = fabs(g_createParams.width*gameAspect);
+	newHeight = g_createParams.height;
+	
+	if((newWidth - floor(newWidth) > 0.5))
+		newx = ceil(newWidth);
+	else 
+		newx = floor(newWidth);
+	
+	if ((newHeight - floor(newHeight) > 0.5))
+		newy = ceil(newHeight);
+	else 
+		newy = floor(newHeight);
+	 
+	offsetx = ceil(newx - g_createParams.width)/2;
+	offsety = 0;
+	
+	newx = newx - (newx % 2);
+	newy = newy - (newy % 2);
+	
+	offsetx = 0;
+	nx_SetResolution(g_createParams.width ,g_createParams.height);
   
   return 0;
 }
@@ -140,7 +168,7 @@ void osd_update_video_and_audio(struct mame_display *display)
 					unsigned char g = (color >> 8 ) & 0xFF;
 					unsigned char b = (color ) & 0xFF;
 					 									
-					framebuf[(uint32_t) gfxGetFramebufferDisplayOffset((uint32_t) j  , (uint32_t) i  )] = RGBA8_MAXALPHA(r,g,b);
+					framebuf[(uint32_t) gfxGetFramebufferDisplayOffset((uint32_t) j + offsetx , (uint32_t) i + offsety )] = RGBA8_MAXALPHA(r,g,b);
 					
                }
 			   
