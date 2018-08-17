@@ -232,7 +232,7 @@ namespace UI
                 }
                 else if(i == 1)
                 {
-					DrawText(fntLarge, 475, 200, txtcolor, "No Options - Yet");
+					DrawText(fntLarge, 320, 400, txtcolor, "No Options - Yet");
                      
                 }
 				else if(i == 2)

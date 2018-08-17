@@ -6,7 +6,7 @@
 #include "driver.h"
 #include "usrintrf.h"
  
-#include <switch/gfx/gfx.h> 
+#include <switch.h> 
 
 static INT32 frameCount = 0;
 static float g_desiredFPS = 0.0f;
@@ -24,6 +24,7 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
   
 	debugload("osd_create_display \n");
 	gfxInitDefault();
+	gfxSetMode(GfxMode_TiledDouble);
 	
 	set_ui_visarea( 0,0,0,0 );
 	
@@ -63,6 +64,7 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 		g_createParams.aspect_y = temp;
 	}
 	
+	
 				
 	const float vidScrnAspect = (float)1280.0 / 720.0;
 	const float gameAspect = (float)g_createParams.aspect_x/g_createParams.aspect_y;
@@ -85,13 +87,13 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 	offsetx = ceil(newx - g_createParams.width)/2;
 	offsety = 0;
 	
-	newx = newx - (newx % 2);
-	newy = newy - (newy % 2);
-	
-	offsetx = 0;
-	nx_SetResolution(g_createParams.width ,g_createParams.height);
+	newx = newx - (newx % 4);
+	newy = newy - (newy % 4);
+ 
+	nx_SetResolution(newx ,newy);
+		
   
-  return 0;
+	return 0;
 }
 
 //---------------------------------------------------------------------
@@ -137,10 +139,10 @@ void osd_update_video_and_audio(struct mame_display *display)
 	
 	if( display->changed_flags & GAME_BITMAP_CHANGED )
 	{		 
-		//nx_SoftRender(	display->game_bitmap, &display->game_bitmap_update,NULL );
-		
+ 		
 		uint32_t width, height;
 		uint32_t pos;
+ 		
 		uint32_t *framebuf = (uint32_t*) gfxGetFramebuffer((uint32_t*)&width, (uint32_t*)&height);
 	 		 
          const uint32_t x = display->game_visible_area.min_x;
@@ -148,35 +150,33 @@ void osd_update_video_and_audio(struct mame_display *display)
          const uint32_t pitch = display->game_bitmap->rowpixels;
 
          // Copy pixels
-		 
-		 char depth[50];
-		 sprintf(depth,"depth = %d\n", display->game_bitmap->depth);
-		 //svcOutputDebugString(depth);
-		 
+ 
          //if(display->game_bitmap->depth == 16)			
          {            	
-	 			 	
+	 		
+			// theres probably a much cleaner way of doing this
+			
             const uint16_t* input = &((uint16_t*)display->game_bitmap->base)[y * pitch + x];
 
             for(int i = 0; i < height; i ++)
             {
-               for (int j = 0; j < width; j ++)
+               for (int j = offsetx; j < width - offsetx; j ++)
                {
-					const uint32_t color = g_pal32Lookup[*input++];                												
+					const uint32_t color = g_pal32Lookup[*input++];
 					
 					unsigned char r = (color >> 16 ) & 0xFF;
 					unsigned char g = (color >> 8 ) & 0xFF;
 					unsigned char b = (color ) & 0xFF;
-					 									
-					framebuf[(uint32_t) gfxGetFramebufferDisplayOffset((uint32_t) j + offsetx , (uint32_t) i + offsety )] = RGBA8_MAXALPHA(r,g,b);
-					
+					 											
+					framebuf[(uint32_t) gfxGetFramebufferDisplayOffset((uint32_t) j, (uint32_t) i)] = RGBA8_MAXALPHA(r,g,b);
+														
                }
-			   
-               input += pitch - width;
+ 
+               input += pitch - (g_createParams.width);
             }
 			             
          }
- 
+  
 		// Wait out the remaining time for this frame
 		if( lastFrameEndTime &&         
 			performance->game_speed_percent >= 99.0f  )
@@ -224,252 +224,7 @@ const char *osd_get_fps_text( const struct performance_info *performance )
 	return NULL;
 }
  
- 
- 
-int nx_SoftRender(	struct mame_bitmap *bitmap,
-					const struct rectangle *bounds,
-					void *vector_dirty_pixels )
-{
-
-	uint32_t width, height;
-	uint32_t pos;
-	uint8_t *framebuf = (uint8_t*) gfxGetFramebuffer((uint32_t*)&width, (uint32_t*)&height);
-	frameCount ++;
-	     	
-	if( vector_dirty_pixels )
-	{
-	 
-	}
-	else
-	{
-		  // Blit the bitmap to the texture
-		if( bitmap->depth == 15 || bitmap->depth == 16 )
-		{
-			if( g_createParams.video_attributes & VIDEO_RGB_DIRECT )
-			{
-				  // Destination buffer is in 15 bit X1R5G5B5
-				nx_RenderDirect16( framebuf, bitmap, bounds );
-				
-				svcOutputDebugString("nx_RenderDirect16",20);
-			}
-			else
-			{
-				  // Have to translate the colors through the palette lookup table
-				nx_RenderPalettized16( framebuf, bitmap, bounds );
-								
-			}
-		}
-		else if( bitmap->depth == 32 )
-		{
-				//svcOutputDebugString("32 bit",20);
-				nx_RenderDirect32( framebuf, bitmap, bounds );
-		}	
-		//else
-	//		fatalerror( "Attempt to render with unknown depth %lu!\nPlease report this game immediately!", bitmap->depth );
-	}
-  	 
-	gfxFlushBuffers();
-	gfxSwapBuffers();
-	gfxWaitForVsync();
- 
-	return 0;
- 
-}  
-
-
-//-------------------------------------------------------------
-//	nx_RenderDirect16
-//-------------------------------------------------------------
-void nx_RenderDirect16( void *dest, struct mame_bitmap *bitmap, const struct rectangle *bnds )
-{
-	struct rectangle bounds = *bnds;
-	++bounds.max_x;
-	++bounds.max_y;
-
-	UINT16 *destBuffer;
-	UINT16 *sourceBuffer = (UINT16*)bitmap->base;
-
-	destBuffer = (UINT16*)dest;
-
-	if( g_createParams.orientation & ORIENTATION_SWAP_XY )
-	{
-		sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
-
-		// SwapXY 
-		destBuffer += bounds.min_y;  // The bounds.min_y value gives us our starting X coord
-		destBuffer += (bounds.min_x * g_createParams.width); // The bounds.min_x value gives us our starting Y coord
-
-		// Render, treating sourceBuffer as normal (x and y not swapped)
-		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
-		{
-			UINT16	*offset = destBuffer;
-			UINT16  *sourceOffset = sourceBuffer;
-
-			for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
-			{
-				*offset = *(sourceOffset++);
-				offset += g_createParams.width;   // Increment the output Y value
-			}
-
-			sourceBuffer += bitmap->rowpixels;
-			++destBuffer;          // Come left ("down") one row
-		}
-	}
-	else
-	{ 
-		sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
-		destBuffer += ((bounds.min_y * g_createParams.width) + bounds.min_x);
-
-		UINT32 scanLen = (bounds.max_x - bounds.min_x) << 1;
-
-		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
-		{
-			memcpy( destBuffer, sourceBuffer, scanLen );
-			destBuffer += g_createParams.width;
-			sourceBuffer += bitmap->rowpixels;
-		}
-	}
-
-	 
-}
-
-
-//-------------------------------------------------------------
-//	nx_RenderDirect32
-//-------------------------------------------------------------
-void nx_RenderDirect32( void *dest, struct mame_bitmap *bitmap, const struct rectangle *bnds )
-{
-	struct rectangle bounds = *bnds;
-	++bounds.max_x;
-	++bounds.max_y;
-
-		// 32 bit direct
-	if( !(g_createParams.video_attributes & VIDEO_RGB_DIRECT) )
-	{			 
-		return;
-	}
-	
-	UINT32 *destBuffer;
-	UINT32 *sourceBuffer = (UINT32*)bitmap->base;
-
-	destBuffer = (UINT32*)dest;
-
-  	// Destination buffer is in 32 bit X8R8G8B8
-	if( g_createParams.orientation & ORIENTATION_SWAP_XY )
-	{
-		sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
-
-		// SwapXY 
-		destBuffer += bounds.min_y;  // The bounds.min_y value gives us our starting X coord
-		destBuffer += (bounds.min_x * g_createParams.width); // The bounds.min_x value gives us our starting Y coord
-
-		// Render, treating sourceBuffer as normal (x and y not swapped)
-		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
-		{
-			UINT32	*offset = destBuffer;
-			UINT32  *sourceOffset = sourceBuffer;
-
-			for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
-			{
-				*offset = *(sourceOffset++);
-				offset += g_createParams.width;   // Increment the output Y value
-			}
-
-			sourceBuffer += bitmap->rowpixels;
-			++destBuffer;          // Move right ("down") one row
-		}
-	}
-	else
-	{ 
-		sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
-
-		destBuffer += ((bounds.min_y * g_createParams.width) + bounds.min_x);
-		UINT32 scanLen = (bounds.max_x - bounds.min_x) << 2;
-
-		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
-		{
-			memcpy( destBuffer, sourceBuffer, scanLen );
-			destBuffer += g_createParams.width;
-			sourceBuffer += bitmap->rowpixels;
-		}
-	}
-
-	 
-}
-
- 
-//-------------------------------------------------------------
-//	nx_RenderPalettized16
-//-------------------------------------------------------------
-void nx_RenderPalettized16( void *dest, struct mame_bitmap *bitmap, const struct rectangle *bnds )
-{
-
-	struct rectangle bounds = *bnds;
-	++bounds.max_x;
-	++bounds.max_y;
-
-	UINT32 *destBuffer;
-	UINT16 *sourceBuffer = (UINT16*)bitmap->base;
-
-	  // If we a filtering render into a temp buffer then filter that buffer
-	  // into the actual framebuffer
-	 
-	destBuffer = (UINT32*)dest;
-
-		// bitmap format is 16 bit indices into the palette
-		// Destination buffer is in 32 bit X8R8G8B8
-	if( g_createParams.orientation & ORIENTATION_SWAP_XY )
-	{ 
-		sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
-
-		// SwapXY
-		destBuffer += bounds.min_y;  // The bounds.min_y value gives us our starting X coord
-		destBuffer += (bounds.min_x * g_createParams.width); // The bounds.min_x value gives us our starting Y coord
-
-      // Render, treating sourceBuffer as normal (x and y not swapped)
-		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
-		{
-			UINT32	*offset = destBuffer;
-			UINT16  *sourceOffset = sourceBuffer;
-
-			for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
-			{
-			  // Offset is in RGBX format	
-				*offset = g_pal32Lookup[ *(sourceOffset++) ];
-
-			  // Skip to the next row
-				offset += g_createParams.width;   // Increment the output Y value
-			}
-
-			sourceBuffer += bitmap->rowpixels;
-			++destBuffer;          // Come left ("down") one row
-		}
-		
-	}
-	else
-	{
-			sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
-			destBuffer += (bounds.min_y * 720 + bounds.min_x);
-
-			for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
-			{
-				UINT32	*offset = destBuffer;
-				UINT16  *sourceOffset = sourceBuffer;
-
-				for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
-				{
-			  // Offset is in RGBX format	
-					*(offset++) = g_pal32Lookup[ *(sourceOffset++) ];
-				}
-
-				destBuffer += g_createParams.width;
-				sourceBuffer += bitmap->rowpixels;
-			}		
-
-	}
-	 
-}
-
+  
 
 //------------------------------------------------------------
 //	nx_UpdatePalette
