@@ -23,7 +23,7 @@ int main()
 	options.samplerate = 48000;
 	options.use_samples = true;
 	
-	options.use_filter = true;
+	options.use_filter = false;
 	
 	options.brightness = 1.0f;
 	options.pause_bright = 0.65f;

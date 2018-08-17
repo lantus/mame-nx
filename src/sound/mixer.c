@@ -712,7 +712,11 @@ int mixer_sh_start(void)
 
 	/* determine if we're playing in stereo or not */
 	first_free_channel = 0;
+#ifdef SWITCH
+	is_stereo = 1;		// dirty hack !
+#else	
 	is_stereo = ((Machine->drv->sound_attributes & SOUND_SUPPORTS_STEREO) != 0);
+#endif
 
 	/* clear the accumulators */
 	accum_base = 0;
