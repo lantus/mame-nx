@@ -81,10 +81,10 @@ void nxCustomizeInputPortDefaults( struct ipd *defaults )
 		switch( entry->type )
 		{
 		case IPT_UI_CONFIGURE:
-			/*REMAP_SEQ_7(  	BUTTONCODE( 0, BUTTON_RA ), CODE_OR, 
-							BUTTONCODE( 1, BUTTON_RA ), CODE_OR,
-							BUTTONCODE( 2, BUTTON_RA ), CODE_OR,
-							BUTTONCODE( 3, BUTTON_RA ));*/
+			REMAP_SEQ_7(  	BUTTONCODE( 0, BUTTON_RA_STICK ), CODE_OR, 
+							BUTTONCODE( 1, BUTTON_RA_STICK ), CODE_OR,
+							BUTTONCODE( 2, BUTTON_RA_STICK ), CODE_OR,
+							BUTTONCODE( 3, BUTTON_RA_STICK ));
 			break;
 		case IPT_UI_CANCEL:
 			REMAP_SEQ_11(	JOYCODE_1_SELECT, JOYCODE_1_START, CODE_OR, 

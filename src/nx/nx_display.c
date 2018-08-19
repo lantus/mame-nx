@@ -148,10 +148,10 @@ void osd_update_video_and_audio(struct mame_display *display)
          const uint32_t x = display->game_visible_area.min_x;
          const uint32_t y = display->game_visible_area.min_y;
          const uint32_t pitch = display->game_bitmap->rowpixels;
-
+		  
          // Copy pixels
  
-         //if(display->game_bitmap->depth == 16)			
+         if(display->game_bitmap->depth == 16)			
          {            	
 	 		
 			// theres probably a much cleaner way of doing this

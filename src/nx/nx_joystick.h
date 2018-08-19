@@ -47,7 +47,9 @@ typedef enum ButtonID {
   BUTTON_PLUS,
   BUTTON_MINUS,   
   BUTTON_ZL,               
-  BUTTON_ZR                
+  BUTTON_ZR,
+  BUTTON_LA_STICK,
+  BUTTON_RA_STICK,
 };
 
  

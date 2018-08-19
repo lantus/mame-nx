@@ -78,6 +78,7 @@ void nxInitializeJoystick( void )
     ADDENTRY( "Minus",        JOYCODE( stickIndex, JT_BUTTON, BUTTON_MINUS ),          STDCODE( SELECT ) );     
     ADDENTRY( "LThumb",       JOYCODE( stickIndex, JT_BUTTON, BUTTON_ZL ),             CODE_OTHER );
     ADDENTRY( "RThumb",       JOYCODE( stickIndex, JT_BUTTON, BUTTON_ZR ),             CODE_OTHER );
+	ADDENTRY( "RA Stick",     JOYCODE( stickIndex, JT_BUTTON, BUTTON_RA_STICK ),       CODE_OTHER );
 
 
   }
@@ -130,7 +131,11 @@ int osd_is_joy_pressed( int joycode )
 				case BUTTON_PLUS:
 					return (buttons & KEY_PLUS);
 				case BUTTON_MINUS:
-					return (buttons & KEY_MINUS);				 
+					return (buttons & KEY_MINUS);		
+				case BUTTON_LA_STICK:
+					return (buttons & KEY_LSTICK);	
+				case BUTTON_RA_STICK:
+					return (buttons & KEY_RSTICK);						
 			}
 			break;
 
