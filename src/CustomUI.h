@@ -337,6 +337,146 @@ namespace UI
 			
 			Draw();
         }
+		else if( k & KEY_DRIGHT)
+        {
+ 
+			char currName[200];
+			char c;
+			int oCursorPos;
+			int tmp;
+
+			int gameIndex = mapRoms[currentGame]; 
+			
+			// default don`t clamp cursor
+			bool bClampCursor = false;
+
+			oCursorPos = fCursorPos;
+			tmp = fCursorPos;
+
+			strcpy(currName, drivers[gameIndex]->description);
+			c = currName[0];
+									
+			while((fGameSelect + tmp) < iNumGames - 1)
+			{
+				char name[200];
+				char n;
+
+				tmp ++;
+				
+				strcpy(name, m_vecAvailRomList[fGameSelect+tmp].c_str());
+				n = name[0];
+								
+				
+				if(n > c)
+				{
+					fCursorPos = tmp; //(iGameidx - oGameidx);
+
+					if( fCursorPos > iWindowMiddle )
+					{
+						// clamp cursor position
+						bClampCursor = true;
+				
+						// advance gameselect
+						if(fGameSelect == 0) fGameSelect += (fCursorPos - iWindowMiddle);
+						else  fGameSelect += (fCursorPos - oCursorPos);
+
+						// clamp game window range (high)
+						if((fGameSelect + iMaxWindowList) > iNumGames)
+						{						
+							fCursorPos = oCursorPos + (fGameSelect - (iNumGames - iMaxWindowList));
+							
+							// clamp to end
+							fGameSelect = iNumGames - iMaxWindowList;
+					
+							// advance cursor pos after all!
+							bClampCursor = false;
+					
+							// clamp cursor to end
+							if(fCursorPos > iMaxWindowList-1)
+							fCursorPos = iMaxWindowList-1;
+						}
+					}
+					
+					// check for cursor clamp
+					if( bClampCursor )
+						fCursorPos = iWindowMiddle;	
+										
+					break;
+				}
+			}
+
+			Draw();
+			
+        }
+		else if( k & KEY_DLEFT)
+        {
+ 
+			char currName[200];
+			char c;
+			int oCursorPos;
+			int tmp;
+
+			int gameIndex = mapRoms[currentGame]; 
+			
+			// default don`t clamp cursor
+			bool bClampCursor = false;
+
+			oCursorPos = fCursorPos;
+			tmp = fCursorPos;
+
+			strcpy(currName, drivers[gameIndex]->description);
+			c = currName[0];
+									
+			while((fGameSelect + tmp) > 0)
+			{
+				char name[200];
+				char n;
+
+				tmp--;
+				
+				strcpy(name, m_vecAvailRomList[fGameSelect+tmp].c_str());
+				n = name[0];
+												 				
+				if(n < c)
+				{
+					fCursorPos = tmp;
+
+					if( fCursorPos < iWindowMiddle )
+					{
+						// clamp cursor position
+						bClampCursor = true;
+				
+						// backup window pos
+						fGameSelect -= (oCursorPos - fCursorPos);
+				
+						// clamp game window range (low)
+						if(fGameSelect < 0)
+						{
+							// clamp to start
+							fGameSelect = 0;
+					
+							// backup cursor pos after all!
+							bClampCursor = false;
+					
+							// clamp cursor to end
+							if( fCursorPos < 0 )
+								fCursorPos = 0;
+						}
+					}
+					
+					// check for cursor clamp
+					if( bClampCursor )
+					fCursorPos = iWindowMiddle;	
+
+					 
+					break;
+				}
+
+			}
+
+			Draw();
+			
+        }
 		
 		
 		
