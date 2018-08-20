@@ -18,8 +18,7 @@ int main()
 	romList.RefreshRomList();
 	 
 	UI::Init();
-	
-	
+		
 	options.samplerate = 48000;
 	options.use_samples = true;
 	

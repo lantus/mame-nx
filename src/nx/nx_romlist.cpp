@@ -29,7 +29,6 @@ int ThreeOrFourPlayerOnly = 0;
 
 std::vector<std::string> m_vecAvailRomList;
 std::vector<std::string> m_ListData;
-std::map<std::string, int> mapType;
 std::map<std::string, int> mapRoms;
 
 
@@ -118,20 +117,13 @@ int CRomList::RefreshRomList()
 	}
  
 	InitRomList();
-
-	mapType.clear();
-  
-   
+	 
     for( totalMAMEGames = 0; drivers[totalMAMEGames]; ++totalMAMEGames)
 	{
 		char fullname[60];
 		sprintf(fullname,"%s.zip",drivers[totalMAMEGames]->name);
 		
-		vecAvailRomListFileName.push_back(fullname);
-		//vecAvailRomList.push_back(drivers[totalMAMEGames]->name);
-		//vecAvailRomIndex.push_back(totalMAMEGames);
-
-		//mapType[drivers[totalMAMEGames]->name] = totalMAMEGames;
+		vecAvailRomListFileName.push_back(fullname);	 
 		mapRoms[drivers[totalMAMEGames]->description] = totalMAMEGames;
 
 	}

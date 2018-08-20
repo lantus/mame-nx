@@ -51,6 +51,8 @@ int db = 0;
 		
 namespace UI
 {
+	std::string currentGame;
+	
 	int selRed,selGreen,selBlue,selAlpha;
 	int optRed,optGreen,optBlue,optAlpha;
 	
@@ -145,7 +147,7 @@ namespace UI
     }
 
     void Draw()
-    {
+    {		
 		char currentName[120];
 		int	iTempGameSel;
 		int	iGameidx;
@@ -209,17 +211,19 @@ namespace UI
 					iTempGameSel = iGameSelect;
 
 					if (iNumGames == 0)	
-						DrawText(fntLarge, 320, 202, txtcolor, "No Roms Found");	 
+						DrawText(fntLarge, fx, 202, txtcolor, "No Roms Found");	 
 					for	(iGameidx=0; iGameidx<iMaxWindowList;	iGameidx++)
 					{
 						
 						sprintf( currentName, "");
-						sprintf( currentName, "%s\n", m_vecAvailRomList[iTempGameSel++].c_str() );
+						sprintf( currentName, "%s", m_vecAvailRomList[iTempGameSel++].c_str() );
 
 
 						if (iGameidx==iCursorPos){
 							 
 							DrawText(fntLarge, fx, fy + (28*iGameidx), { selRed, selGreen, selBlue, 255 }, currentName);
+							
+							currentGame = currentName; 
 						}
 						else
 						{
@@ -232,12 +236,12 @@ namespace UI
                 }
                 else if(i == 1)
                 {
-					DrawText(fntLarge, 320, 400, txtcolor, "No Options - Yet");
+					DrawText(fntLarge, 450, 400, txtcolor, "No Options - Yet");
                      
                 }
 				else if(i == 2)
                 {
-                   
+                   DrawText(fntLarge, 450, 400, txtcolor, "Release 1. Ported by MVG in 2018");
                 }
 				else if(i == 3)
                 {
@@ -304,6 +308,8 @@ namespace UI
 			{
 				// clamp cursor	position
 				bClampCursor = true;
+				
+				//fCursorPos += 0.8f * 0.5f * 5.0f;	// velocity
 
 				// advance gameselect
 				if(fGameSelect == 0) fGameSelect +=	(fCursorPos	- iWindowMiddle);
@@ -359,8 +365,8 @@ namespace UI
             Draw();
         }
         else if(k & KEY_A)
-        {			 
-            int gameIndex = mapRoms[m_vecAvailRomList[iCursorPos]]; 
+        {			 			 
+            int gameIndex = mapRoms[currentGame]; 
 			SDL_SetRenderDrawColor(sdl_render, 0, 0, 0, 255);
 			SDL_RenderClear(sdl_render);
 		 
