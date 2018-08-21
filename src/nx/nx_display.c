@@ -52,7 +52,8 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 	g_createParams.orientation = (Machine->gamedrv->flags & ORIENTATION_MASK);
 	g_desiredFPS = params->fps;
 	
-		// Flip the width and height
+	/*
+	// Flip the width and height
 	if( g_createParams.orientation & ORIENTATION_SWAP_XY )
 	{
 		INT32 temp = g_createParams.height;
@@ -62,7 +63,7 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 		temp = g_createParams.aspect_x;
 		g_createParams.aspect_x = g_createParams.aspect_y;
 		g_createParams.aspect_y = temp;
-	}
+	}*/
 	
 	
 				
