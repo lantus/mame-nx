@@ -21,6 +21,9 @@ extern "C" {
 #include "mame.h"
 }
 
+
+#define	GAMESELECT 1
+#define	CONFIGSCREEN 2
  
 extern std::vector<std::string> m_vecAvailRomList;
 extern std::map<std::string, int> mapRoms;
@@ -29,6 +32,7 @@ extern CRomList romList;
 const int GAMESEL_MaxWindowList	= 16;		 
 const int GAMESEL_WindowMiddle = 8;	
 
+int MenuState;
 SDL_Renderer *menu_render;
 TTF_Font *menuFntLarge;
 
@@ -236,12 +240,13 @@ namespace UI
                 }
                 else if(i == 1)
                 {
-					DrawText(fntLarge, 450, 400, txtcolor, "No Options - Yet");
+					DrawText(fntLarge, 450, 400, txtcolor, "Rotate Vertical Games");
+					DrawText(fntLarge, 450, 420, txtcolor, "Keep Aspect Ratio");
                      
                 }
 				else if(i == 2)
                 {
-                   DrawText(fntLarge, 450, 400, txtcolor, "Release 1. Ported by MVG in 2018");
+                   DrawText(fntLarge, 450, 400, txtcolor, "Release 2. Ported by MVG in 2018");
                 }
 				else if(i == 3)
                 {
@@ -505,25 +510,38 @@ namespace UI
             Draw();
         }
         else if(k & KEY_A)
-        {			 			 
-            int gameIndex = mapRoms[currentGame]; 
-			SDL_SetRenderDrawColor(sdl_render, 0, 0, 0, 255);
-			SDL_RenderClear(sdl_render);
-		 
-			options.ui_orientation = drivers[gameIndex]->flags & ORIENTATION_MASK;
+        {			 	
 
-			if( options.ui_orientation & ORIENTATION_SWAP_XY )
-			{
-		   
-				if( (options.ui_orientation & ROT180) == ORIENTATION_FLIP_X ||
-					(options.ui_orientation & ROT180) == ORIENTATION_FLIP_Y)
-				options.ui_orientation ^= ROT180;
-			}
+			//switch (selected)
+			//{ 
+			//	case 0:
+					int gameIndex = mapRoms[currentGame]; 
+					SDL_SetRenderDrawColor(sdl_render, 0, 0, 0, 255);
+					SDL_RenderClear(sdl_render);
+				 
+					options.ui_orientation = drivers[gameIndex]->flags & ORIENTATION_MASK;
+
+					if( options.ui_orientation & ORIENTATION_SWAP_XY )
+					{
+				   
+						if( (options.ui_orientation & ROT180) == ORIENTATION_FLIP_X ||
+							(options.ui_orientation & ROT180) == ORIENTATION_FLIP_Y)
+						options.ui_orientation ^= ROT180;
+					}
+					
+					run_game(gameIndex);
+					svcOutputDebugString("game exited",20);
+					SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);					
+					//break;
+				//case 1:
+				
+					
+				
+					//break;
+					
+			//}
 			
-            run_game(gameIndex);
-			svcOutputDebugString("game exited",20);
-			SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);
-            Draw();
+			Draw();
         }
         else if(k & KEY_B)
         {            
@@ -537,6 +555,8 @@ namespace UI
 
     void Init()
     {
+		MenuState = GAMESELECT;
+		
 		fGameSelect	= 0.0f;
 		iGameSelect	= 0;
 		fCursorPos = 0.0f;

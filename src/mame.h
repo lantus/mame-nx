@@ -216,6 +216,12 @@ struct GameOptions
 	int		min_width;		/* minimum width for the display */
 	int		min_height;		/* minimum height for the display */
 	#endif
+	
+#ifdef SWITCH
+
+	int		rotateVertical;	 
+	
+#endif	
 };
 
 

@@ -146,7 +146,7 @@ OBJ = obj/$(NAME)
 
 EMULATOR = $(BINDIR)/$(NAME).elf
 
-DEFS = -DALIGN_SHORTS -DALIGN_INTS -DLSB_FIRST -DINLINE="static __inline__" -DSWITCH
+DEFS = -DALIGN_SHORTS -DALIGN_INTS -DLSB_FIRST -DINLINE="static __inline__" -DSWITCH  -D__SWITCH__
 
 CFLAGS = -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
 CXXFLAGS = -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
@@ -191,7 +191,7 @@ MAPFLAGS =
 endif
 
 # platform .mak files will want to add to this
-LIBS = -lfreetype -lSDL2_ttf -lSDL2_gfx -lSDL2_image -lpng -ljpeg `sdl2-config --libs` `freetype-config --libs` -lz -lnx -lm
+LIBS = -lfreetype -lSDL2_ttf -lSDL2_gfx -lSDL2_image -lpng -ljpeg `sdl2-config --libs` `freetype-config --libs` -lz  -lglad -lEGL -lglapi -ldrm_nouveau -lnx -lm
 
 OBJDIRS = obj $(OBJ) $(OBJ)/cpu $(OBJ)/sound $(OBJ)/$(MAMEOS) \
 	$(OBJ)/drivers $(OBJ)/machine $(OBJ)/vidhrdw $(OBJ)/sndhrdw

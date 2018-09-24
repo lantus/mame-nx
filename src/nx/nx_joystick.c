@@ -8,7 +8,8 @@
 #include "inptport.h"
 #include "nx_joystick.h"
 
-#include <switch.h>
+#include "nx_mame.h" 
+#include <switch.h> 
  
 #define ANALOG_AS_DIGITAL_DEADZONE	100
  

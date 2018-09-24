@@ -1,8 +1,10 @@
+
  
 #include "osdepend.h"
 #include "osd_cpu.h"
 #include "driver.h"
- 
+
+#include "nx_mame.h"
 #include <switch.h>
   
 int samples_per_frame = 0;

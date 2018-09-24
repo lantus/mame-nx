@@ -14,11 +14,15 @@ CRomList romList;
  
 int main()
 {	
+	socketInitializeDefault();
+	nxlinkStdio();
+	
 	romList.InitRomList();
 	romList.RefreshRomList();
 	 
 	UI::Init();
 		
+	options.rotateVertical = true;
 	options.samplerate = 48000;
 	options.use_samples = true;
 	
