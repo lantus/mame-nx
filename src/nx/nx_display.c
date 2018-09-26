@@ -7,11 +7,18 @@
 #include <stdlib.h>
 #include <switch.h> 
 
-
 #include <EGL/egl.h>    // EGL library
 #include <EGL/eglext.h> // EGL extensions
 #include <glad/glad.h>  // glad library (OpenGL loader)
 
+#define GL_MATRIX_MODE				0x0BA0
+#define GL_MODELVIEW				0x1700
+#define GL_PROJECTION				0x1701
+#define GL_TEXTURE					0x1702
+
+
+static int nTextureWidth = 0;
+static int nTextureHeight = 0;
 
 static INT32 frameCount = 0;
 static float g_desiredFPS = 0.0f;
@@ -21,19 +28,12 @@ int newx, newy;
 
 UINT32	g_pal32Lookup[65536] = {0};
  
-typedef struct Vertex
-{
-	float position[3];
-	float color[3];
-} Vertex;
-
-static const Vertex vertices[] =
-{
-	{ { -0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
-	{ {  0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
-	{ {  0.0f,  0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
-};
-	
+// These will hold our original (pre filtered/scaled) width/height
+static int                        g_OrigRenderWidth;
+static int                        g_OrigRenderHeight;
+ 
+unsigned char pixels[1000000];
+ 
 //-----------------------------------------------------------------------------
 // EGL initialization
 //-----------------------------------------------------------------------------
@@ -41,6 +41,87 @@ static const Vertex vertices[] =
 static EGLDisplay s_display;
 static EGLContext s_context;
 static EGLSurface s_surface;
+
+
+static inline int VidGetTextureSize(int size)
+{
+	int textureSize = 128;
+	while (textureSize < size) {
+		textureSize <<= 1;
+	}
+	return textureSize;
+}
+
+
+
+
+static void Helper_RenderPalettized16( void *dest, struct mame_bitmap *bitmap, const struct rectangle *bnds )
+{
+	struct rectangle bounds = *bnds;
+	++bounds.max_x;
+	++bounds.max_y;
+
+	UINT32 *destBuffer;
+	UINT16 *sourceBuffer = (UINT16*)bitmap->base;
+  
+	destBuffer = (UINT32*)dest;
+	 
+
+	// bitmap format is 16 bit indices into the palette
+	// Destination buffer is in 32 bit X8R8G8B8
+	if( g_createParams.orientation & ORIENTATION_SWAP_XY )
+	{ 
+		sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
+
+		// SwapXY
+		destBuffer += bounds.min_y;  // The bounds.min_y value gives us our starting X coord
+		destBuffer += (bounds.min_x * g_OrigRenderWidth); // The bounds.min_x value gives us our starting Y coord
+
+		// Render, treating sourceBuffer as normal (x and y not swapped)
+		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
+		{
+			UINT32	*offset = destBuffer;
+			UINT16  *sourceOffset = sourceBuffer;
+
+			for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
+			{
+				// Offset is in RGBX format	
+				*offset = g_pal32Lookup[ *(sourceOffset++) ];
+
+				// Skip to the next row
+				offset += g_OrigRenderWidth;   // Increment the output Y value
+			}
+
+			sourceBuffer += bitmap->rowpixels;
+			++destBuffer;          // Come left ("down") one row
+		}
+	}
+	else
+	{		
+		sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;		 
+		destBuffer += (g_OrigRenderWidth);
+		 
+		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
+		{
+			UINT32	*offset = destBuffer;
+			UINT16  *sourceOffset = sourceBuffer;
+
+			for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
+			{
+				// Offset is in RGBX format	
+				*(offset++) = g_pal32Lookup[ *(sourceOffset++) ];
+			}
+
+			destBuffer += g_OrigRenderWidth;
+			sourceBuffer += bitmap->rowpixels;
+			
+			 
+		}
+	}
+	
+	 
+
+}
 
 static bool initEgl()
 {
@@ -139,42 +220,37 @@ static void deinitEgl()
 // Main program
 //-----------------------------------------------------------------------------
 
-static void setMesaConfig()
-{
-    // Uncomment below to disable error checking and save CPU time (useful for production):
-    //setenv("MESA_NO_ERROR", "1", 1);
-
-    // Uncomment below to enable Mesa logging:
-    //setenv("EGL_LOG_LEVEL", "debug", 1);
-    setenv("MESA_VERBOSE", "all", 1);
-    //setenv("NOUVEAU_MESA_DEBUG", "1", 1);
-
-    // Uncomment below to enable shader debugging in Nouveau:
-    //setenv("NV50_PROG_OPTIMIZE", "0", 1);
-    //setenv("NV50_PROG_DEBUG", "1", 1);
-    //setenv("NV50_PROG_CHIPSET", "0x120", 1);
-}
-
 static const char* const vertexShaderSource = R"text(
-    #version 330 core
-    layout (location = 0) in vec3 aPos;
-    layout (location = 1) in vec3 aColor;
-    out vec3 ourColor;
-    void main()
-    {
-        gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
-        ourColor = aColor;
-    }
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aColor;
+layout (location = 2) in vec2 aTexCoord;
+
+out vec3 ourColor;
+out vec2 TexCoord;
+
+void main()
+{
+	gl_Position = vec4(aPos, 1.0);
+	ourColor = aColor;
+	TexCoord = vec2(aTexCoord.x, aTexCoord.y);
+}
 )text";
 
 static const char* const fragmentShaderSource = R"text(
-    #version 330 core
-    in vec3 ourColor;
-    out vec4 fragColor;
-    void main()
-    {
-        fragColor = vec4(ourColor, 1.0f);
-    }
+#version 330 core
+out vec4 FragColor;
+
+in vec3 ourColor;
+in vec2 TexCoord;
+
+// texture sampler
+uniform sampler2D texture1;
+
+void main()
+{
+	FragColor = texture(texture1, TexCoord);
+}
 )text";
 
 static GLuint createAndCompileShader(GLenum type, const char* source)
@@ -192,7 +268,7 @@ static GLuint createAndCompileShader(GLenum type, const char* source)
     glCompileShader(handle);
     glGetShaderiv(handle, GL_COMPILE_STATUS, &success);
 
-    if (!success)
+    if (success == GL_FALSE)
     {
         glGetShaderInfoLog(handle, sizeof(msg), NULL, msg);
         //TRACE("%u: %s\n", type, msg);
@@ -202,16 +278,30 @@ static GLuint createAndCompileShader(GLenum type, const char* source)
 
     return handle;
 }
-
+ 
+float vertices[] = {
+    // positions          // colors           // texture coords
+     1.5f,  1.5f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 0.0f,   // top right
+     1.5f, -1.5f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f,   // bottom right
+    -1.5f, -1.5f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f,   // bottom left
+    -1.5f,  1.5f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 0.0f    // top left 
+};
+ 
+unsigned int indices[] = {  
+	0, 1, 3, // first triangle
+	1, 2, 3  // second triangle
+};
+	
 static GLuint s_program;
-static GLuint s_vao, s_vbo;
-
+static unsigned int VBO, VAO, EBO;
+static GLuint s_tex;
+ 
 //---------------------------------------------------------------------
 //	osd_create_display
 //---------------------------------------------------------------------
 int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_components )
 {
-	setMesaConfig();
+	//setMesaConfig();
 
     // Initialize EGL
     if (!initEgl())
@@ -230,45 +320,52 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 
     GLint success;
     glGetProgramiv(s_program, GL_LINK_STATUS, &success);
-    if (!success)
+    if (success == GL_FALSE)
     {
         char buf[512];
         glGetProgramInfoLog(s_program, sizeof(buf), NULL, buf);
-        //TRACE("Link error: %s", buf);
+        return EXIT_FAILURE;
     }
     glDeleteShader(vsh);
     glDeleteShader(fsh);
+ 
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
 
+    glBindVertexArray(VAO);
 
-    glGenVertexArrays(1, &s_vao);
-    glGenBuffers(1, &s_vbo);
-    // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
-    glBindVertexArray(s_vao);
-
-    glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    // position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
+    // color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    // texture coord attribute
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+ 
 
-    // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    // Textures
+    glGenTextures(1, &s_tex);
+    glActiveTexture(GL_TEXTURE0); // activate the texture unit first before binding texture
+    glBindTexture(GL_TEXTURE_2D, s_tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // You can unbind the VAO afterwards so other VAO calls won't accidentally modify this VAO, but this rarely happens. Modifying other
-    // VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
-    glBindVertexArray(0);
-	
-	//debugload("osd_create_display \n");
-	//gfxInitDefault();
-	//gfxSetMode(GfxMode_TiledDouble);
-	
+			 
+	glUseProgram(s_program);
+ 
 	set_ui_visarea( 0,0,0,0 );
-	
-	//debugload("set_ui_visarea \n");
-	
+ 	
 	if(Machine->color_depth == 16)
 	{
       /* 32bpp only */
@@ -298,8 +395,14 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 		options.rotateVertical = true;
 	}
 	
+	  // Store our original width and height
+	g_OrigRenderWidth  = g_createParams.width;
+	g_OrigRenderHeight = g_createParams.height;
 	
-				
+	nTextureWidth =  VidGetTextureSize(g_createParams.width);
+	nTextureHeight =  VidGetTextureSize(g_createParams.height);
+ 	
+ 		
 	const float vidScrnAspect = (float)1280.0 / 720.0;
 	const float gameAspect = (float)g_createParams.aspect_x/g_createParams.aspect_y;
 	
@@ -325,7 +428,11 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 	newy = newy - (newy % 4);
  
 	//nx_SetResolution(newx ,newy);
-		
+ 
+	
+	//unsigned char *pixels = (unsigned char *) malloc((size_t) (g_createParams.width * g_createParams.height * 2));	
+
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, g_createParams.width, g_createParams.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);	
   
 	return 0;
 }
@@ -336,7 +443,7 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 void osd_close_display(void)
 {
 	gfxInitDefault();
-	nx_SetResolution(1280,720);
+	//nx_SetResolution(1280,720);
 }
 
 //---------------------------------------------------------------------
@@ -354,7 +461,7 @@ void osd_update_video_and_audio(struct mame_display *display)
 {
 	static cycles_t lastFrameEndTime = 0;
 	const struct performance_info *performance = mame_get_performance_info();
-  
+   
 	if( display->changed_flags & GAME_VISIBLE_AREA_CHANGED )
 	{
 				
@@ -372,53 +479,26 @@ void osd_update_video_and_audio(struct mame_display *display)
 	
 	
 	if( display->changed_flags & GAME_BITMAP_CHANGED )
-	{		 
- 		
-		uint32_t width, height;
-		uint32_t pos;
- 		
+	{		  		 		 
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 		if (options.rotateVertical)
 		{
 				//svcOutputDebugString("rotating",20);
 				// gfxConfigureResolution(newy, newx);				 
 				 //gfxConfigureTransform(NATIVE_WINDOW_TRANSFORM_FLIP_V| NATIVE_WINDOW_TRANSFORM_ROT_90);
 		}
-			 
-		//uint32_t *framebuf = (uint32_t*) gfxGetFramebuffer((uint32_t*)&width, (uint32_t*)&height);
-	 		 
-         const uint32_t x = display->game_visible_area.min_x;
-         const uint32_t y = display->game_visible_area.min_y;
-         const uint32_t pitch = display->game_bitmap->rowpixels;
-		  
-         // Copy pixels
  
-         if(display->game_bitmap->depth == 16)			
-         {            	
+ 
+        if(display->game_bitmap->depth == 16)			
+        {            	
 	 		
-			// theres probably a much cleaner way of doing this
-			
-            const uint16_t* input = &((uint16_t*)display->game_bitmap->base)[y * pitch + x];
+			Helper_RenderPalettized16(pixels, display->game_bitmap, &display->game_bitmap_update );
 
-            for(int i = 0; i < height; i ++)
-            {
-               for (int j = offsetx; j < width - offsetx; j ++)
-               {
-					const uint32_t color = g_pal32Lookup[*input++];
-					
-					unsigned char r = (color >> 16 ) & 0xFF;
-					unsigned char g = (color >> 8 ) & 0xFF;
-					unsigned char b = (color ) & 0xFF;
-					 											
-					//framebuf[(uint32_t) gfxGetFramebufferDisplayOffset((uint32_t) j, (uint32_t) i)] = RGBA8_MAXALPHA(r,g,b);
-														
-               }
- 
-               input += pitch - (g_createParams.height);
-            }
-			
-			             
-         }
-  
+		}
+		 
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, g_createParams.width, g_createParams.height, 0, GL_BGRA, GL_UNSIGNED_BYTE, pixels);	
+  			                      
 		// Wait out the remaining time for this frame
 		if( lastFrameEndTime &&         
 			performance->game_speed_percent >= 99.0f  )
@@ -440,20 +520,11 @@ void osd_update_video_and_audio(struct mame_display *display)
 		  // Tag the end of this frame
 		lastFrameEndTime = osd_cycles();
 	}
-
-	//gfxFlushBuffers();
-	//gfxSwapBuffers();
-	//gfxWaitForVsync();
-	
-	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // draw our first triangle
-    glUseProgram(s_program);
-    glBindVertexArray(s_vao); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
-    glDrawArrays(GL_TRIANGLES, 0, 3);	
+ 
+    // draw our textured cube
+    glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized	
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	eglSwapBuffers(s_display, s_surface);
-
  
 }
 
