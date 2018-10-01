@@ -7,9 +7,7 @@ extern "C" {
 #include "osd_cpu.h"
 #include "driver.h"
 #include "mame.h"
- 
-bool initEgl();
-void deinitEgl();
+
 }
 
 CRomList romList;	
@@ -18,15 +16,12 @@ CRomList romList;
 int main()
 {	
 	socketInitializeDefault();
-	nxlinkStdio();
-		
+	 	
 	romList.InitRomList();
 	romList.RefreshRomList();
 	 
 	UI::Init();
-	
-	initEgl();
-		
+ 
 	options.rotateVertical = true;
 	options.samplerate = 48000;
 	options.use_samples = true;
@@ -46,9 +41,7 @@ int main()
     {
         UI::Loop();
     }
-	
-	deinitEgl();
-	
+ 
     UI::Exit();
 	
     return 0;

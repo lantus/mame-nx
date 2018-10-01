@@ -19,6 +19,11 @@ extern "C" {
 #include "osd_cpu.h"
 #include "driver.h"
 #include "mame.h"
+
+ 
+bool initEgl();
+void deinitEgl();
+
 }
 
 
@@ -32,6 +37,7 @@ extern CRomList romList;
 const int GAMESEL_MaxWindowList	= 16;		 
 const int GAMESEL_WindowMiddle = 8;	
 
+static bool bGLInited = false;
 int MenuState;
 SDL_Renderer *menu_render;
 TTF_Font *menuFntLarge;
@@ -145,7 +151,14 @@ namespace UI
         SDL_DestroyRenderer(sdl_render);
         SDL_FreeSurface(sdl_surf);
         SDL_DestroyWindow(sdl_wnd);
-        SDL_Quit();
+		
+		if (bGLInited)
+		{
+			deinitEgl();
+			bGLInited = false;
+		}
+		
+        SDL_Quit();		
         romfsExit();
         exit(0);
     }
@@ -518,7 +531,7 @@ namespace UI
 					int gameIndex = mapRoms[currentGame]; 
 					SDL_SetRenderDrawColor(sdl_render, 0, 0, 0, 255);
 					SDL_RenderClear(sdl_render);
-				 
+					 
 					options.ui_orientation = drivers[gameIndex]->flags & ORIENTATION_MASK;
 
 					if( options.ui_orientation & ORIENTATION_SWAP_XY )
@@ -529,8 +542,16 @@ namespace UI
 						options.ui_orientation ^= ROT180;
 					}
 					
+					if (!bGLInited)
+					{
+					    initEgl();
+						bGLInited = true;
+					}
+					
 					run_game(gameIndex);					 
-					SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);					
+					
+					SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);		
+					SDL_RenderClear(sdl_render);					
 					//break;
 				//case 1:
 				

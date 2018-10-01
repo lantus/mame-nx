@@ -274,8 +274,7 @@ static GLuint s_tex;
 //---------------------------------------------------------------------
 int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_components )
 {	 
-	gfxInitDefault();
-
+	
 	// Store the creation params
 	memcpy( &g_createParams, params, sizeof(g_createParams) );
 
