@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <switch.h> 
-
+ 
 #include <EGL/egl.h>    // EGL library
 #include <EGL/eglext.h> // EGL extensions
 #include <glad/glad.h>  // glad library (OpenGL loader)
@@ -32,7 +32,7 @@ UINT32	g_pal32Lookup[65536] = {0};
 static int                        g_OrigRenderWidth;
 static int                        g_OrigRenderHeight;
  
-unsigned char pixels[1000000];
+unsigned char pixels[100000];
  
 //-----------------------------------------------------------------------------
 // EGL initialization
@@ -65,65 +65,30 @@ static void Helper_RenderPalettized16( void *dest, struct mame_bitmap *bitmap, c
 	UINT16 *sourceBuffer = (UINT16*)bitmap->base;
   
 	destBuffer = (UINT32*)dest;
+ 
+	sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;		 
+	destBuffer += (g_OrigRenderWidth);
 	 
+	for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
+	{
+		UINT32	*offset = destBuffer;
+		UINT16  *sourceOffset = sourceBuffer;
 
-	// bitmap format is 16 bit indices into the palette
-	// Destination buffer is in 32 bit X8R8G8B8
-	if( g_createParams.orientation & ORIENTATION_SWAP_XY )
-	{ 
-		sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
-
-		// SwapXY
-		destBuffer += bounds.min_y;  // The bounds.min_y value gives us our starting X coord
-		destBuffer += (bounds.min_x * g_OrigRenderWidth); // The bounds.min_x value gives us our starting Y coord
-
-		// Render, treating sourceBuffer as normal (x and y not swapped)
-		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
+		for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
 		{
-			UINT32	*offset = destBuffer;
-			UINT16  *sourceOffset = sourceBuffer;
-
-			for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
-			{
-				// Offset is in RGBX format	
-				*offset = g_pal32Lookup[ *(sourceOffset++) ];
-
-				// Skip to the next row
-				offset += g_OrigRenderWidth;   // Increment the output Y value
-			}
-
-			sourceBuffer += bitmap->rowpixels;
-			++destBuffer;          // Come left ("down") one row
+			// Offset is in RGBX format	
+			*(offset++) = g_pal32Lookup[ *(sourceOffset++) ];
 		}
-	}
-	else
-	{		
-		sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;		 
-		destBuffer += (g_OrigRenderWidth);
+
+		destBuffer += g_OrigRenderWidth;
+		sourceBuffer += bitmap->rowpixels;
+		
 		 
-		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
-		{
-			UINT32	*offset = destBuffer;
-			UINT16  *sourceOffset = sourceBuffer;
-
-			for( UINT32 x = bounds.min_x; x < bounds.max_x; ++x )
-			{
-				// Offset is in RGBX format	
-				*(offset++) = g_pal32Lookup[ *(sourceOffset++) ];
-			}
-
-			destBuffer += g_OrigRenderWidth;
-			sourceBuffer += bitmap->rowpixels;
-			
-			 
-		}
 	}
-	
-	 
-
+ 
 }
 
-static bool initEgl()
+bool initEgl()
 {
     // Connect to the EGL default display
     s_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
@@ -197,7 +162,7 @@ _fail0:
     return false;
 }
 
-static void deinitEgl()
+void deinitEgl()
 {
     if (s_display)
     {
@@ -281,10 +246,18 @@ static GLuint createAndCompileShader(GLenum type, const char* source)
  
 float vertices[] = {
     // positions          // colors           // texture coords
-     1.0f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 0.0f,   // top right
-     1.0f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f,   // bottom right
-    -1.0f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f,   // bottom left
-    -1.0f,  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 0.0f    // top left 
+     0.76f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 0.0f,   // top right
+     0.76f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f,   // bottom right
+    -0.76f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f,   // bottom left
+    -0.76f,  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 0.0f    // top left 
+};
+
+float rotvertices[] = {
+    // positions          // colors           // texture coords
+	-0.4f,  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   1.0f, 0.0f,    // top left 
+     0.4f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // top right
+     0.4f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   0.0f, 1.0f,   // bottom right
+    -0.4f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left    
 };
  
 unsigned int indices[] = {  
@@ -300,13 +273,16 @@ static GLuint s_tex;
 //	osd_create_display
 //---------------------------------------------------------------------
 int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_components )
-{
-	//setMesaConfig();
+{	 
+	gfxInitDefault();
 
-    // Initialize EGL
-    if (!initEgl())
-        return EXIT_FAILURE;
+	// Store the creation params
+	memcpy( &g_createParams, params, sizeof(g_createParams) );
 
+    // Fill out the orientation from the game driver
+	g_createParams.orientation = (Machine->gamedrv->flags & ORIENTATION_MASK);
+	g_desiredFPS = params->fps;
+ 
     // Load OpenGL routines using glad
     gladLoadGL();
 	
@@ -336,7 +312,12 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	
+	if (g_createParams.orientation & ROT90)
+		glBufferData(GL_ARRAY_BUFFER, sizeof(rotvertices), rotvertices, GL_STATIC_DRAW);
+	else
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+		
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
@@ -358,10 +339,9 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
     glBindTexture(GL_TEXTURE_2D, s_tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-			 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+ 	 
 	glUseProgram(s_program);
  
 	set_ui_visarea( 0,0,0,0 );
@@ -379,22 +359,7 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 		rgb_components[1] = 0x00FF00;
 		rgb_components[2] = 0x0000FF;
 	}
-
-	
-	// Store the creation params
-	memcpy( &g_createParams, params, sizeof(g_createParams) );
-
-    // Fill out the orientation from the game driver
-	g_createParams.orientation = (Machine->gamedrv->flags & ORIENTATION_MASK);
-	g_desiredFPS = params->fps;
-	
-	
-	// Flip the width and height
-	if( g_createParams.orientation & ORIENTATION_SWAP_XY )
-	{
-		options.rotateVertical = true;
-	}
-	
+ 
 	  // Store our original width and height
 	g_OrigRenderWidth  = g_createParams.width;
 	g_OrigRenderHeight = g_createParams.height;
@@ -427,12 +392,6 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 	newx = newx - (newx % 4);
 	newy = newy - (newy % 4);
  
-	//nx_SetResolution(newx ,newy);
- 
-	
-	//unsigned char *pixels = (unsigned char *) malloc((size_t) (g_createParams.width * g_createParams.height * 2));	
-
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, g_createParams.width, g_createParams.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);	
   
 	return 0;
 }
@@ -442,8 +401,15 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 //---------------------------------------------------------------------
 void osd_close_display(void)
 {
-	gfxInitDefault();
-	//nx_SetResolution(1280,720);
+	
+	// clean up opengl
+	 
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
+ 
+	glDeleteProgram(s_program);
+ 	
 }
 
 //---------------------------------------------------------------------
@@ -481,23 +447,18 @@ void osd_update_video_and_audio(struct mame_display *display)
 	if( display->changed_flags & GAME_BITMAP_CHANGED )
 	{		  		 		 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		if (options.rotateVertical)
-		{
-				//svcOutputDebugString("rotating",20);
-				// gfxConfigureResolution(newy, newx);				 
-				 //gfxConfigureTransform(NATIVE_WINDOW_TRANSFORM_FLIP_V| NATIVE_WINDOW_TRANSFORM_ROT_90);
-		}
  
  
         if(display->game_bitmap->depth == 16)			
         {            	
 	 		
 			Helper_RenderPalettized16(pixels, display->game_bitmap, &display->game_bitmap_update );
+			
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_createParams.width, g_createParams.height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);	
 
 		}
 		 
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, g_createParams.width, g_createParams.height, 0, GL_BGRA, GL_UNSIGNED_BYTE, pixels);	
+		
   			                      
 		// Wait out the remaining time for this frame
 		if( lastFrameEndTime &&         
@@ -522,7 +483,7 @@ void osd_update_video_and_audio(struct mame_display *display)
 	}
  
     // draw our textured cube
-    glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized	
+    glBindVertexArray(VAO);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	eglSwapBuffers(s_display, s_surface);
  
@@ -575,29 +536,3 @@ void nx_UpdatePalette( struct mame_display *display )
 		}
 	}
 }
-
- 
-void nx_SetResolution(uint32_t width, uint32_t height)
-{
-    uint32_t x, y, w, h, i;
-    uint32_t *fb;
-
-    // clear framebuffers before switching res
-    for (i = 0; i < 2; i++) {
-
-        fb = (uint32_t *) gfxGetFramebuffer(&w, &h);
-
-        for (y = 0; y < h; y++) {
-            for (x = 0; x < w; x++) {
-                fb[gfxGetFramebufferDisplayOffset(x, y)] =
-                    (uint32_t) RGBA8_MAXALPHA(0, 0, 0);
-            }
-        }
-
-        gfxFlushBuffers();
-        gfxSwapBuffers();
-        gfxWaitForVsync();
-    }
-
-    gfxConfigureResolution(width, height);
-} 

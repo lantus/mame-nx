@@ -240,8 +240,8 @@ namespace UI
                 }
                 else if(i == 1)
                 {
-					DrawText(fntLarge, 450, 400, txtcolor, "Rotate Vertical Games");
-					DrawText(fntLarge, 450, 420, txtcolor, "Keep Aspect Ratio");
+					//DrawText(fntLarge, 450, 400, txtcolor, "Rotate Vertical Games");
+					//DrawText(fntLarge, 450, 420, txtcolor, "Keep Aspect Ratio");
                      
                 }
 				else if(i == 2)
@@ -529,8 +529,7 @@ namespace UI
 						options.ui_orientation ^= ROT180;
 					}
 					
-					run_game(gameIndex);
-					svcOutputDebugString("game exited",20);
+					run_game(gameIndex);					 
 					SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);					
 					//break;
 				//case 1:

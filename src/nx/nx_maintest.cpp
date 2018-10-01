@@ -8,19 +8,24 @@ extern "C" {
 #include "driver.h"
 #include "mame.h"
  
+bool initEgl();
+void deinitEgl();
 }
 
 CRomList romList;	
+ 
  
 int main()
 {	
 	socketInitializeDefault();
 	nxlinkStdio();
-	
+		
 	romList.InitRomList();
 	romList.RefreshRomList();
 	 
 	UI::Init();
+	
+	initEgl();
 		
 	options.rotateVertical = true;
 	options.samplerate = 48000;
@@ -41,7 +46,11 @@ int main()
     {
         UI::Loop();
     }
+	
+	deinitEgl();
+	
     UI::Exit();
+	
     return 0;
 }
 
