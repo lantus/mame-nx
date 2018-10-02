@@ -96,7 +96,7 @@ EXE = .exe
 VPATH=src $(wildcard src/cpu/*)
 
 # compiler, linker and utilities
-AR = @ar
+AR = aarch64-none-elf-gcc-ar
 CC = aarch64-none-elf-gcc
 CXX = aarch64-none-elf-g++
 LD = aarch64-none-elf-g++
