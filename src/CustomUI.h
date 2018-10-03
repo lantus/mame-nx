@@ -151,13 +151,7 @@ namespace UI
         SDL_DestroyRenderer(sdl_render);
         SDL_FreeSurface(sdl_surf);
         SDL_DestroyWindow(sdl_wnd);
-		
-		if (bGLInited)
-		{
-			deinitEgl();
-			bGLInited = false;
-		}
-		
+ 
         SDL_Quit();		
         romfsExit();
         exit(0);
@@ -541,15 +535,9 @@ namespace UI
 							(options.ui_orientation & ROT180) == ORIENTATION_FLIP_Y)
 						options.ui_orientation ^= ROT180;
 					}
-					
-					if (!bGLInited)
-					{
-					    initEgl();
-						bGLInited = true;
-					}
-					
+										 				
 					run_game(gameIndex);					 
-					
+										 
 					SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);		
 					SDL_RenderClear(sdl_render);					
 					//break;

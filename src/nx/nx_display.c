@@ -91,6 +91,7 @@ static void Helper_RenderPalettized16( void *dest, struct mame_bitmap *bitmap, c
 bool initEgl()
 {
     // Connect to the EGL default display
+	
     s_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     if (!s_display)
     {
@@ -166,6 +167,8 @@ void deinitEgl()
 {
     if (s_display)
     {
+		eglMakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+		  
         if (s_context)
         {
             eglDestroyContext(s_display, s_context);
@@ -176,8 +179,10 @@ void deinitEgl()
             eglDestroySurface(s_display, s_surface);
             s_surface = NULL;
         }
-        eglTerminate(s_display);
-        s_display = NULL;
+        
+		eglTerminate(s_display);
+        
+		s_display = NULL;
     }
 }
 
@@ -274,6 +279,9 @@ static GLuint s_tex;
 //---------------------------------------------------------------------
 int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_components )
 {	 
+
+	if (!s_display)
+		initEgl();
 	
 	// Store the creation params
 	memcpy( &g_createParams, params, sizeof(g_createParams) );
@@ -402,12 +410,14 @@ void osd_close_display(void)
 {
 	
 	// clean up opengl
-	 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
- 
+	
+	glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO); 	
+    glDeleteVertexArrays(1, &VAO);    
 	glDeleteProgram(s_program);
+	
+	//deinitEgl();
+		 
  	
 }
 
