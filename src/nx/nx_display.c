@@ -264,6 +264,14 @@ float rotvertices[] = {
      0.4f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   0.0f, 1.0f,   // bottom right
     -0.4f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left    
 };
+
+float rotvertices90[] = {
+    // positions          // colors           // texture coords
+	 0.4f, -1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   1.0f, 0.0f,    // top left 
+    -0.4f, -1.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // top right
+    -0.4f,  1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   0.0f, 1.0f,   // bottom right
+     0.4f,   1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left    
+};
  
 unsigned int indices[] = {  
 	0, 1, 3, // first triangle
@@ -320,8 +328,10 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	
-	if (g_createParams.orientation & ROT90)
+	if (g_createParams.orientation  & ORIENTATION_FLIP_Y)
 		glBufferData(GL_ARRAY_BUFFER, sizeof(rotvertices), rotvertices, GL_STATIC_DRAW);
+	else if (g_createParams.orientation  & ORIENTATION_FLIP_X)
+		glBufferData(GL_ARRAY_BUFFER, sizeof(rotvertices), rotvertices90, GL_STATIC_DRAW);	
 	else
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 		
