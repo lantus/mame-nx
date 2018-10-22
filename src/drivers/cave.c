@@ -888,11 +888,14 @@ WRITE16_HANDLER( pwrinst2_vctrl_1_w )	{ vctrl_w(cave_vctrl_1, offset, data, mem_
 WRITE16_HANDLER( pwrinst2_vctrl_2_w )	{ vctrl_w(cave_vctrl_2, offset, data, mem_mask); }
 WRITE16_HANDLER( pwrinst2_vctrl_3_w )	{ vctrl_w(cave_vctrl_3, offset, data, mem_mask); }
 
+static data16_t *data_rom;
+
 static MEMORY_READ16_START( pwrinst2_readmem )
 	{ 0x000000, 0x1fffff, MRA16_ROM					},	// ROM
 	{ 0x400000, 0x40ffff, MRA16_RAM					},	// RAM
 	{ 0x500000, 0x500001, input_port_0_word_r		},	// Inputs
 	{ 0x500002, 0x500003, input_port_1_word_r		},	//
+	{ 0x600000, 0x6fffff, MRA16_ROM                 }, 	// Extra Data ROM Space
 	{ 0x800000, 0x807fff, MRA16_RAM					},	// Layer 2
 	{ 0x880000, 0x887fff, MRA16_RAM					},	// Layer 0
 	{ 0x900000, 0x907fff, MRA16_RAM					},	// Layer 1
@@ -905,7 +908,7 @@ static MEMORY_READ16_START( pwrinst2_readmem )
 /**/{ 0xc00000, 0xc00005, MRA16_RAM					},	// Layer 1 Control
 /**/{ 0xc80000, 0xc80005, MRA16_RAM					},	// Layer 3 Control
 	{ 0xa80000, 0xa8007f, donpachi_videoregs_r		},	// Video Regs
-	{ 0xd80000, 0xd80001, MRA16_NOP					},	// ? From Sound CPU
+	{ 0xd80000, 0xd80001, soundlatch_ack_r			},	// From Sound CPU
 	{ 0xe80000, 0xe80001, pwrinst2_eeprom_r			},	// EEPROM
 	{ 0xf00000, 0xf04fff, MRA16_RAM					},	// Palette
 MEMORY_END
@@ -913,6 +916,7 @@ MEMORY_END
 static MEMORY_WRITE16_START( pwrinst2_writemem )
 	{ 0x000000, 0x1fffff, MWA16_ROM							},	// ROM
 	{ 0x400000, 0x40ffff, MWA16_RAM							},	// RAM
+	{ 0x600000, 0x6fffff, MWA16_ROM, &data_rom              }, 	// Extra Data ROM Space
 	{ 0x700000, 0x700001, cave_eeprom_msb_w					},	// EEPROM
 	{ 0x800000, 0x807fff, cave_vram_2_w,     &cave_vram_2	},	// Layer 2
 	{ 0x880000, 0x887fff, cave_vram_0_w,     &cave_vram_0	},	// Layer 0
@@ -930,6 +934,50 @@ static MEMORY_WRITE16_START( pwrinst2_writemem )
 	{ 0xf00000, 0xf04fff, paletteram16_xGGGGGRRRRRBBBBB_word_w, &paletteram16 },	// Palette
 MEMORY_END
 
+
+static MEMORY_READ16_START( plegends_readmem )
+	{ 0x000000, 0x1fffff, MRA16_ROM					},	// ROM
+	{ 0x400000, 0x40ffff, MRA16_RAM					},	// RAM
+	{ 0x500000, 0x500001, input_port_0_word_r		},	// Inputs
+	{ 0x500002, 0x500003, input_port_1_word_r		},  //
+	{ 0x600000, 0x6fffff, MRA16_ROM                 }, 	// Extra Data ROM Space
+	{ 0x800000, 0x807fff, MRA16_RAM					},	// Layer 2
+	{ 0x880000, 0x887fff, MRA16_RAM					},	// Layer 0
+	{ 0x900000, 0x907fff, MRA16_RAM					},	// Layer 1
+	{ 0x980000, 0x987fff, MRA16_RAM					},	// Layer 3
+	{ 0xa00000, 0xa07fff, MRA16_RAM					},	// Sprites
+	{ 0xa08000, 0xa0ffff, MRA16_RAM					},	// Sprites?
+	{ 0xa10000, 0xa1ffff, MRA16_RAM					},	// Sprites?
+/**/{ 0xb00000, 0xb00005, MRA16_RAM					},	// Layer 2 Control
+/**/{ 0xb80000, 0xb80005, MRA16_RAM					},	// Layer 0 Control
+/**/{ 0xc00000, 0xc00005, MRA16_RAM					},	// Layer 1 Control
+/**/{ 0xc80000, 0xc80005, MRA16_RAM					},	// Layer 3 Control
+	{ 0xa80000, 0xa8007f, donpachi_videoregs_r		},	// Video Regs
+	{ 0xd80000, 0xd80001, soundlatch_ack_r			},	// From Sound CPU
+	{ 0xe80000, 0xe80001, pwrinst2_eeprom_r			},	// EEPROM
+	{ 0xf00000, 0xf04fff, MRA16_RAM					},	// Palette
+MEMORY_END
+
+static MEMORY_WRITE16_START( plegends_writemem )
+	{ 0x000000, 0x1fffff, MWA16_ROM							},	// ROM
+	{ 0x400000, 0x40ffff, MWA16_RAM							},	// RAM
+	{ 0x600000, 0x6fffff, MWA16_ROM, &data_rom              }, 	// Extra Data ROM Space
+	{ 0x700000, 0x700001, cave_eeprom_msb_w					},	// EEPROM
+	{ 0x800000, 0x807fff, cave_vram_2_w,     &cave_vram_2	},	// Layer 2
+	{ 0x880000, 0x887fff, cave_vram_0_w,     &cave_vram_0	},	// Layer 0
+	{ 0x900000, 0x907fff, cave_vram_1_w,     &cave_vram_1	},	// Layer 1
+	{ 0x980000, 0x987fff, cave_vram_3_8x8_w, &cave_vram_3	},	// Layer 3
+	{ 0xa00000, 0xa07fff, MWA16_RAM, &spriteram16, &spriteram_size	},	// Sprites
+	{ 0xa08000, 0xa0ffff, MWA16_RAM							},	// Sprites?
+	{ 0xa10000, 0xa1ffff, MWA16_RAM							},	// Sprites?
+	{ 0xa80000, 0xa8007f, MWA16_RAM, &cave_videoregs		},	// Video Regs
+	{ 0xb00000, 0xb00005, pwrinst2_vctrl_2_w, &cave_vctrl_2			},	// Layer 2 Control
+	{ 0xb80000, 0xb80005, pwrinst2_vctrl_0_w, &cave_vctrl_0			},	// Layer 0 Control
+	{ 0xc00000, 0xc00005, pwrinst2_vctrl_1_w, &cave_vctrl_1			},	// Layer 1 Control
+	{ 0xc80000, 0xc80005, pwrinst2_vctrl_3_w, &cave_vctrl_3			},	// Layer 3 Control
+	{ 0xe00000, 0xe00001, sound_cmd_w						},	// To Sound CPU
+	{ 0xf00000, 0xf04fff, paletteram16_xGGGGGRRRRRBBBBB_word_w, &paletteram16 },	// Palette
+MEMORY_END
 
 /***************************************************************************
 								Sailor Moon
@@ -1281,8 +1329,7 @@ static PORT_WRITE_START( pwrinst2_sound_writeport )
 	{ 0x10, 0x17, pwrinst2_okibank_w		},	// Samples bank
 	{ 0x40, 0x40, YM2203_control_port_0_w	},	// YM2203
 	{ 0x41, 0x41, YM2203_write_port_0_w		},	//
-//	{ 0x50, 0x50, IOWP_NOP		},	// ?? volume
-//	{ 0x51, 0x51, IOWP_NOP		},	// ?? volume
+	{ 0x50, 0x50, soundlatch_ack_w			},  // To Main CPU
 	{ 0x80, 0x80, pwrinst2_rombank_w		},	// ROM bank
 PORT_END
 
@@ -2390,6 +2437,42 @@ static MACHINE_DRIVER_START( pwrinst2 )
 	MDRV_SOUND_ADD(OKIM6295, okim6295_intf_pwrinst2)
 MACHINE_DRIVER_END
 
+static MACHINE_DRIVER_START( plegends )
+
+	/* basic machine hardware */
+	MDRV_CPU_ADD(M68000, 16000000)
+	MDRV_CPU_MEMORY(plegends_readmem,plegends_writemem)
+	MDRV_CPU_VBLANK_INT(cave_interrupt,1)
+
+	MDRV_CPU_ADD(Z80,16000000 / 2)
+	MDRV_CPU_FLAGS(CPU_AUDIO_CPU)	/* ? */
+	MDRV_CPU_MEMORY(pwrinst2_sound_readmem,pwrinst2_sound_writemem)
+	MDRV_CPU_PORTS(pwrinst2_sound_readport,pwrinst2_sound_writeport)
+
+	MDRV_FRAMES_PER_SECOND(15625/271.5)
+	MDRV_VBLANK_DURATION(DEFAULT_60HZ_VBLANK_DURATION)
+
+	MDRV_MACHINE_INIT(cave)
+	MDRV_NVRAM_HANDLER(cave)
+
+	/* video hardware */
+	MDRV_VIDEO_ATTRIBUTES(VIDEO_TYPE_RASTER)
+	MDRV_SCREEN_SIZE(0x200, 240)
+	MDRV_VISIBLE_AREA(0x70, 0x70 + 0x140-1, 0, 240-1)
+	MDRV_GFXDECODE(pwrinst2_gfxdecodeinfo)
+	MDRV_PALETTE_LENGTH(0x5000/2)
+	MDRV_COLORTABLE_LENGTH(0x8000+0x2800)
+
+	MDRV_PALETTE_INIT(pwrinst2)
+	MDRV_VIDEO_START(cave_4_layers)
+	MDRV_VIDEO_UPDATE(cave)
+
+	/* sound hardware */
+	MDRV_SOUND_ATTRIBUTES(SOUND_SUPPORTS_STEREO)
+	MDRV_SOUND_ADD(YM2203, ym2203_intf_pwrinst2)
+	MDRV_SOUND_ADD(OKIM6295, okim6295_intf_pwrinst2)
+MACHINE_DRIVER_END
+
 
 /***************************************************************************
 						Sailor Moon / Air Gallet
@@ -3255,7 +3338,7 @@ ROM_END
 
 							Power Instinct 2
 
-©1994 Atlus
+1994 Atlus
 CPU: 68000, Z80
 Sound: YM2203, AR17961 (x2)
 Custom: NMK 112 (sound?), Atlus 8647-01  013, 038 (x4)
@@ -3267,45 +3350,48 @@ X3 = 16 MHz
 
 ROM_START( pwrinst2 )
 	ROM_REGION( 0x200000, REGION_CPU1, 0 )		/* 68000 code */
-	ROM_LOAD16_BYTE( "g02.u45", 0x000000, 0x80000, CRC(7b33bc43) )
-	ROM_LOAD16_BYTE( "g02.u44", 0x000001, 0x80000, CRC(8f6f6637) )
-	ROM_LOAD16_BYTE( "g02.u43", 0x100000, 0x80000, CRC(178e3d24) )
-	ROM_LOAD16_BYTE( "g02.u42", 0x100001, 0x80000, CRC(a0b4ee99) )
+	ROM_LOAD16_BYTE( "g02.u45", 0x000000, 0x80000, CRC(7b33bc43) SHA1(a68eb94e679f03c354932b8c5cd1bb2922fec0aa) )
+	ROM_LOAD16_BYTE( "g02.u44", 0x000001, 0x80000, CRC(8f6f6637) SHA1(024b12c0fe40e27c79e38bd7601a9183a62d75fd) )
+	ROM_LOAD16_BYTE( "g02.u43", 0x100000, 0x80000, CRC(178e3d24) SHA1(926234f4196a5d5e3bd1438abbf73355f2c65b06) )
+	ROM_LOAD16_BYTE( "g02.u42", 0x100001, 0x80000, CRC(a0b4ee99) SHA1(c6df4aa2543b04d8bda7683f503e5eb763e506af) )
+	
+	ROM_REGION16_BE( 0x100000, REGION_USER1, ROMREGION_ERASE00 )	/* 68000 extra data roms */
+    /* not used */
 
 	ROM_REGION( 0x24000, REGION_CPU2, 0 )		/* Z80 code */
-	ROM_LOAD( "g02.u3a", 0x00000, 0x0c000, CRC(ebea5e1e) )
+	ROM_LOAD( "g02.u3a", 0x00000, 0x0c000, CRC(ebea5e1e) SHA1(4d3af9e5f29d0c1b26563f51250039c9e8bd3735) )
 	ROM_CONTINUE(        0x10000, 0x14000             )
 
 	ROM_REGION( 0xe00000 * 2, REGION_GFX1, 0 )		/* Sprites (do not dispose) */
-	ROM_LOAD( "g02.u61", 0x000000, 0x200000, CRC(91e30398) )
-	ROM_LOAD( "g02.u62", 0x200000, 0x200000, CRC(d9455dd7) )
-	ROM_LOAD( "g02.u63", 0x400000, 0x200000, CRC(4d20560b) )
-	ROM_LOAD( "g02.u64", 0x600000, 0x200000, CRC(b17b9b6e) )
-	ROM_LOAD( "g02.u65", 0x800000, 0x200000, CRC(08541878) )
-	ROM_LOAD( "g02.u66", 0xa00000, 0x200000, CRC(becf2a36) )
-	ROM_LOAD( "g02.u67", 0xc00000, 0x200000, CRC(52fe2b8b) )
+	ROM_LOAD( "g02.u61", 0x000000, 0x200000, CRC(91e30398) SHA1(2b59a5e40bed2a988382054fe30d92808dad3348) )
+	ROM_LOAD( "g02.u62", 0x200000, 0x200000, CRC(d9455dd7) SHA1(afa69fe9a540cd78b8cfecf09cffa1401c01141a) )
+	ROM_LOAD( "g02.u63", 0x400000, 0x200000, CRC(4d20560b) SHA1(ceaee8cf0b69cc366b95ddcb689a5594d79e5114) )
+	ROM_LOAD( "g02.u64", 0x600000, 0x200000, CRC(b17b9b6e) SHA1(fc6213d8322cda4c7f653e2d7d6d314ce84c97b7) )
+	ROM_LOAD( "g02.u65", 0x800000, 0x200000, CRC(08541878) SHA1(138cf077a49a26440a3da1bdc2c399a208359e57) )
+	ROM_LOAD( "g02.u66", 0xa00000, 0x200000, CRC(becf2a36) SHA1(f8b386d0292b1dc745b7253a3df51d1aa8d5e9db) )
+	ROM_LOAD( "g02.u67", 0xc00000, 0x200000, CRC(52fe2b8b) SHA1(dd50aa62f7db995e28f47de9b3fb749aeeaaa5b0) )
 
 	ROM_REGION( 0x200000, REGION_GFX2, ROMREGION_DISPOSE )	/* Layer 0 */
-	ROM_LOAD( "g02.u78", 0x000000, 0x200000, CRC(1eca63d2) )
+	ROM_LOAD( "g02.u78", 0x000000, 0x200000, CRC(1eca63d2) SHA1(538942b43301f950e3d5139461331c54dc90129d) )
 
 	ROM_REGION( 0x100000, REGION_GFX3, ROMREGION_DISPOSE )	/* Layer 1 */
-	ROM_LOAD( "g02.u81", 0x000000, 0x100000, CRC(8a3ff685) )
+	ROM_LOAD( "g02.u81", 0x000000, 0x100000, CRC(8a3ff685) SHA1(4a59ec50ec4470453374fe10f76d3e894494b49f) )
 
 	ROM_REGION( 0x100000, REGION_GFX4, ROMREGION_DISPOSE )	/* Layer 2 */
-	ROM_LOAD( "g02.u89", 0x000000, 0x100000, CRC(373e1f73) )
+	ROM_LOAD( "g02.u89", 0x000000, 0x100000, CRC(373e1f73) SHA1(ec1ae9fab37eee41be8e1bc6dad03809b62fdbce) )
 
 	ROM_REGION( 0x080000, REGION_GFX5, ROMREGION_DISPOSE )	/* Layer 3 */
-	ROM_LOAD( "g02.82a", 0x000000, 0x080000, CRC(4b3567d6) )
+	ROM_LOAD( "g02.82a", 0x000000, 0x080000, CRC(4b3567d6) SHA1(d3e14783b312d2bea9722a8e3c22bcec81e26166) )
 
 	ROM_REGION( 0x440000, REGION_SOUND1, ROMREGION_SOUNDONLY )	/* OKIM6295 #1 Samples */
 	/* Leave the 0x40000 bytes addressable by the chip empty */
-	ROM_LOAD( "g02.u53", 0x040000, 0x200000, CRC(c4bdd9e0) )
-	ROM_LOAD( "g02.u54", 0x240000, 0x200000, CRC(1357d50e) )
+	ROM_LOAD( "g02.u53", 0x040000, 0x200000, CRC(c4bdd9e0) SHA1(a938a831e789ddf6f3cc5f3e5f3877ec7bd62d4e) )
+	ROM_LOAD( "g02.u54", 0x240000, 0x200000, CRC(1357d50e) SHA1(433766177ce9d6933f90de85ba91bfc6d8d5d664) )
 
 	ROM_REGION( 0x440000, REGION_SOUND2, ROMREGION_SOUNDONLY )	/* OKIM6295 #2 Samples */
 	/* Leave the 0x40000 bytes addressable by the chip empty */
-	ROM_LOAD( "g02.u55", 0x040000, 0x200000, CRC(2d102898) )
-	ROM_LOAD( "g02.u56", 0x240000, 0x200000, CRC(9ff50dda) )
+	ROM_LOAD( "g02.u55", 0x040000, 0x200000, CRC(2d102898) SHA1(bd81f4cd2ba100707db0c5bb1419f0b23c998574) )
+	ROM_LOAD( "g02.u56", 0x240000, 0x200000, CRC(9ff50dda) SHA1(1121685e387c20e228032f2b0f5cbb606376fc15) )
 ROM_END
 
 /*
@@ -3773,6 +3859,9 @@ DRIVER_INIT( pwrinst2 )
 		rom[0xD46C/2] = 0xD482;			// kurara dash fix  0xd400 -> 0xd482
 	}
 #endif
+
+	/* set up data Roms */
+	memcpy(data_rom, memory_region(REGION_USER1), memory_region_length(REGION_USER1));
 }
 
 DRIVER_INIT( plegends )
@@ -3803,6 +3892,9 @@ DRIVER_INIT( plegends )
 	cave_spritetype = 3;
 	cave_kludge = 4;
 	time_vblank_irq = 2000;	/**/
+	
+	/* set up data ROMs */
+	memcpy(data_rom, memory_region(REGION_USER1), memory_region_length(REGION_USER1));
 	
 }
 
@@ -3856,7 +3948,7 @@ DRIVER_INIT( uopoko )
 ***************************************************************************/
 
 GAME( 1994, pwrinst2, 0,        pwrinst2, metmqstr, pwrinst2, ROT0,   "Atlus/Cave",                           "Power Instinct 2 (USA)" )
-GAME( 1995, plegends, 0,        pwrinst2, metmqstr, plegends, ROT0,   "Atlus/Cave",                           "Power Instinct Legends (USA)" ) /* 95.06.20 */
+GAME( 1995, plegends, 0,        plegends, metmqstr, plegends, ROT0,   "Atlus/Cave",                           "Power Instinct Legends (USA)" ) /* 95.06.20 */
 GAME( 1994, mazinger, 0,        mazinger, mazinger, mazinger, ROT90,  "Banpresto/Dynamic Pl. Toei Animation", "Mazinger Z"                 ) // region in eeprom
 GAME( 1995, donpachi, 0,        donpachi, cave,     ddonpach, ROT270, "Atlus/Cave",                           "DonPachi (US)"              )
 GAME( 1995, donpachj, donpachi, donpachi, cave,     ddonpach, ROT270, "Atlus/Cave",                           "DonPachi (Japan)"           )
@@ -3876,4 +3968,3 @@ GAME( 1998, espradeo, esprade,  esprade,  cave,     esprade,  ROT270, "Atlus/Cav
 GAME( 1998, uopoko,   0,        uopoko,   cave,     uopoko,   ROT0,   "Cave (Jaleco license)",                "Uo Poko (Japan)"            )
 GAME( 1999, guwange,  0,        guwange,  guwange,  guwange,  ROT270, "Atlus/Cave",                           "Guwange (Japan)"            )
 GAMEX(1999, gaia,     0,        gaia,     gaia,     gaia,     ROT0,   "Noise Factory",                        "Gaia Crusaders", GAME_IMPERFECT_SOUND ) // cuts out occasionally
-
