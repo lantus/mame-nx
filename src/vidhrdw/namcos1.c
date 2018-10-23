@@ -7,26 +7,6 @@
 #define TILECOLORS 1536
 #define BACKGROUNDCOLOR (SPRITECOLORS+2*TILECOLORS)
 
-#define FG_OFFSET 0x7000
-#define MAX_PLAYFIELDS 6
-#define MAX_SPRITES 127
-
-#define UPDATE_SUBLEAD 0x01
-#define UPDATE_TIED 0x02
-#define USE_SP_BUFFER 0x04
-#define UPDATE_OVERRIDE 0x08
-#define MAIN_COMPLETE 0x10
-#define SUB_COMPLETE 0x20
-
-//#define TRY_PDRAWGFX 1
-WRITE_HANDLER( namcos1_main_update_w );
-WRITE_HANDLER( namcos1_sub_update_w );
-
-struct playfield
-{
-	int color;
-};
-
 /*
   video ram map
   0000-1fff : scroll playfield (0) : 64*64*2
@@ -41,7 +21,6 @@ struct playfield
   7ff0-7fff : ?
 */
 static unsigned char *namcos1_videoram;
-
 /*
   paletteram map (s1ram  0x0000-0x7fff)
   0000-17ff : palette page0 : sprite
@@ -50,15 +29,29 @@ static unsigned char *namcos1_videoram;
   6000-7fff : work ram ?
 */
 static unsigned char *namcos1_paletteram;
-
 /*
   controlram map (s1ram 0x8000-0x9fff)
   0000-07ff : work ram
-  0800-0fef : sprite ram    : 0x10 * 127
+  0800-0fef : sprite ram	: 0x10 * 127
   0ff0-0fff : display control register
   1000-1fff : playfield control register
 */
 static data8_t *namcos1_controlram;
+
+#define FG_OFFSET 0x7000
+
+#define MAX_PLAYFIELDS 6
+#define MAX_SPRITES    127
+
+static struct tilemap *tilemap[MAX_PLAYFIELDS];
+
+struct playfield {
+	int 	color;
+};
+
+struct playfield playfields[MAX_PLAYFIELDS];
+
+static UINT8 *mpMaskData;
 
 /* palette dirty information */
 static unsigned char sprite_palette_state[MAX_SPRITES+1];
@@ -68,20 +61,9 @@ static unsigned char tilemap_palette_state[MAX_PLAYFIELDS];
 static int scrolloffsX[4];
 static int scrolloffsY[4];
 
-static data8_t namcos1_playfield_control[0x100];
-struct playfield playfields[MAX_PLAYFIELDS];
-
-static struct tilemap *tilemap[MAX_PLAYFIELDS];
-static UINT8 *mpMaskData;
-
 static int sprite_fixed_sx;
 static int sprite_fixed_sy;
 static int flipscreen;
-
-static unsigned priority_xlat[8] = {0,1,2,3,4,5,6,7};
-static int update_status, idle_counter, idle_threshold;
-static data8_t *sp_updatebuffer, *sp_backbuffer;
-extern int namcos1_game_id;
 
 static void namcos1_set_flipscreen(int flip)
 {
@@ -110,10 +92,13 @@ static void namcos1_set_flipscreen(int flip)
 	tilemap_set_flip(ALL_TILEMAPS,flipscreen ? TILEMAP_FLIPX|TILEMAP_FLIPY : 0);
 }
 
+
+static data8_t namcos1_playfield_control[0x100];
+
 static WRITE_HANDLER( namcos1_playfield_control_w )
 {
 	namcos1_playfield_control[offset] = data;
-#if 0
+
 	/* 0-15 : scrolling */
 	if ( offset < 16 )
 	{
@@ -127,9 +112,7 @@ static WRITE_HANDLER( namcos1_playfield_control_w )
 	{
 	}
 	/* 24-29 palette */
-	else
-#endif
-	if ( offset < 30 )
+	else if ( offset < 30 )
 	{
 		int whichone = offset - 24;
 		if (playfields[whichone].color != (data & 7))
@@ -151,15 +134,15 @@ WRITE_HANDLER( namcos1_videoram_w )
 	{
 		namcos1_videoram[offset] = data;
 		if(offset < FG_OFFSET)
-		{   /* background 0-3 */
-			int layer = offset>>13;
-			int num = (offset &= 0x1fff)>>1;
+		{	/* background 0-3 */
+			int layer = offset/0x2000;
+			int num = (offset &= 0x1fff)/2;
 			tilemap_mark_tile_dirty(tilemap[layer],num);
 		}
 		else
-		{   /* foreground 4-5 */
-			int layer = (offset>>11 & 1) + 4;
-			int num = ((offset&0x7ff)-0x10)>>1;
+		{	/* foreground 4-5 */
+			int layer = (offset&0x800) ? 5 : 4;
+			int num = ((offset&0x7ff)-0x10)/2;
 			if (num >= 0 && num < 0x3f0)
 				tilemap_mark_tile_dirty(tilemap[layer],num);
 		}
@@ -178,13 +161,13 @@ WRITE_HANDLER( namcos1_paletteram_w )
 	{
 		if (offset < 0x2000)
 		{
-			sprite_palette_state[(offset&0x7f0)>>4] = 1;
+			sprite_palette_state[(offset&0x7f0)/16] = 1;
 		}
 		else
 		{
 			int i,color;
 
-			color = (offset&0x700)>>8;
+			color = (offset&0x700)/256;
 			for(i=0;i<MAX_PLAYFIELDS;i++)
 			{
 				if (playfields[i].color == color)
@@ -223,8 +206,8 @@ static void namcos1_palette_refresh(int start,int offset,int num)
 /*
 0-3  unknown
 4-5  sprite offset x
-6    flip screen
-7    sprite offset y
+6	 flip screen
+7	 sprite offset y
 8-15 unknown
 */
 static WRITE_HANDLER( namcos1_displaycontrol_w )
@@ -281,47 +264,36 @@ static WRITE_HANDLER( namcos1_displaycontrol_w )
 
 WRITE_HANDLER( namcos1_videocontrol_w )
 {
-	int olddata = olddata = namcos1_controlram[offset];
 	namcos1_controlram[offset] = data;
 
 	/* 0000-07ff work ram */
-	if (offset < 0x800)
-		return;
+
 	/* 0800-0fef sprite ram */
-	else if (offset < 0xff0) switch (namcos1_game_id)
-	{
-		case 0x0182: // only Rompers use it but this behavior may not be unique
-			if ((offset & 0x0f) == 7 && abs(olddata - data) == 0xff)
-				namcos1_controlram[offset-1] |= 1;
-		break;
-	}
+
 	/* 0ff0-0fff display control ram */
-	else if (offset < 0x1000)
-		namcos1_displaycontrol_w(offset & 0x0f, data);
+	if(offset >= 0xff0 && offset <= 0x0fff)
+	{
+		namcos1_displaycontrol_w(offset&0x0f, data);
+		return;
+	}
 	/* 1000-1fff control ram */
-	else
-		namcos1_playfield_control_w(offset & 0xff, data);
+	else if (offset >= 0x1000)
+		namcos1_playfield_control_w(offset&0xff, data);
 }
 
 /* tilemap callback */
 INLINE void background_get_info(int tile_index,int info_color,data8_t *info_vram)
 {
-	int code;
-
-	tile_index <<= 1;
-	code = info_vram[tile_index+1]+((info_vram[tile_index]&0x3f)<<8);
+	int code = info_vram[2*tile_index+1]+((info_vram[2*tile_index]&0x3f)<<8);
 	SET_TILE_INFO(0,code,info_color,0);
-	tile_info.mask_data = &mpMaskData[code<<3];
+	tile_info.mask_data = &mpMaskData[code*8];
 }
 
 INLINE void foreground_get_info(int tile_index,int info_color,data8_t *info_vram)
 {
-	int code;
-
-	tile_index <<= 1;
-	code = info_vram[tile_index+1]+((info_vram[tile_index]&0x3f)<<8);
+	int code = info_vram[2*tile_index+1]+((info_vram[2*tile_index]&0x3f)<<8);
 	SET_TILE_INFO(0,code,info_color,0);
-	tile_info.mask_data = &mpMaskData[code<<3];
+	tile_info.mask_data = &mpMaskData[code*8];
 }
 
 static void background_get_info0(int tile_index) { background_get_info(tile_index,0,&namcos1_videoram[0x0000]); }
@@ -331,7 +303,8 @@ static void background_get_info3(int tile_index) { background_get_info(tile_inde
 static void foreground_get_info4(int tile_index) { foreground_get_info(tile_index,4,&namcos1_videoram[FG_OFFSET+0x010]); }
 static void foreground_get_info5(int tile_index) { foreground_get_info(tile_index,5,&namcos1_videoram[FG_OFFSET+0x810]); }
 
-#if 0
+
+
 static void update_playfield( int layer )
 {
 	/* for background , set scroll position */
@@ -348,222 +321,6 @@ static void update_playfield( int layer )
 		tilemap_set_scrollx(tilemap[layer],0,scrollx);
 		tilemap_set_scrolly(tilemap[layer],0,scrolly);
 	}
-}
-#endif
-
-#ifdef TRY_PDRAWGFX
-static void draw_sprites(struct mame_bitmap *bitmap, const struct rectangle *cliprect, data8_t *namcos1_spriteram)
-{
-	static const int sprite_sizemap[4] = {16,8,32,4};
-	struct rectangle rect;
-	struct GfxElement *gfx;
-	int sx,sy,code,color,flipx,flipy;
-	int width,height,left,top;
-	int offs, flags;
-	unsigned primask;
-
-	gfx = Machine->gfx[1];
-
-	/* the last 0x10 bytes are control registers, not a sprite */
-	for (offs=0x7e0; offs>=0; offs-=0x10)
-	{
-		width =  sprite_sizemap[(namcos1_spriteram[offs + 4]>>6)&3];
-		height = sprite_sizemap[(namcos1_spriteram[offs + 8]>>1)&3];
-		flipx = ((namcos1_spriteram[offs + 4]>>5)&1) ^ flipscreen;
-		flipy = (namcos1_spriteram[offs + 8]&1) ^ flipscreen;
-		left = (namcos1_spriteram[offs + 4]&0x18) & (~(width-1));
-		top =  (namcos1_spriteram[offs + 8]&0x18) & (~(height-1));
-		code = ((namcos1_spriteram[offs + 4]&7)<<8) + namcos1_spriteram[offs + 5];
-		color = namcos1_spriteram[offs + 6]>>1;
-		flags = (color != 0x7f) ? TRANSPARENCY_PEN : TRANSPARENCY_PEN_TABLE;
-		primask = priority_xlat[namcos1_spriteram[offs + 8]>>5&7];
-
-		/* sx */
-		sx = ((namcos1_spriteram[offs + 6]&1)<<8) + namcos1_spriteram[offs + 7];
-		sx += sprite_fixed_sx;
-
-		if(flipscreen) sx = 210 - sx - width;
-
-		if( sx > 480  ) sx -= 512;
-		if( sx < -32  ) sx += 512;
-		if( sx < -224 ) sx += 512;
-
-		/* sy */
-		sy = sprite_fixed_sy - namcos1_spriteram[offs + 9];
-
-		if(flipscreen) sy = 222 - sy;
-		else sy = sy - height;
-
-		if( sy > 224 ) sy -= 256;
-		if( sy < -32 ) sy += 256;
-
-		rect.min_x=sx;
-		rect.max_x=sx+(width-1);
-		rect.min_y=sy;
-		rect.max_y=sy+(height-1);
-
-		if (cliprect->min_x > rect.min_x) rect.min_x = cliprect->min_x;
-		if (cliprect->max_x < rect.max_x) rect.max_x = cliprect->max_x;
-		if (cliprect->min_y > rect.min_y) rect.min_y = cliprect->min_y;
-		if (cliprect->max_y < rect.max_y) rect.max_y = cliprect->max_y;
-
-		if (flipx) sx -= 32-width-left;
-		else sx -= left;
-		if (flipy) sy -= 32-height-top;
-		else sy -= top;
-
-		// Doesn't work. Can pdrawgfx handle more than 4 layers?
-		pdrawgfx(bitmap, gfx,
-				code,
-				color,
-				flipx, flipy,
-				sx, sy,
-				&rect, flags, 0x0f, primask);
-	}
-}
-#else
-static void draw_sprites(struct mame_bitmap *bitmap,const struct rectangle *cliprect,data8_t *namcos1_spriteram,int priority)
-{
-	static const int sprite_sizemap[4] = {16,8,32,4};
-	struct rectangle rect;
-	struct GfxElement *gfx;
-	int sx,sy,code,color,flipx,flipy;
-	int width,height,left,top;
-	int offs, flags;
-
-	gfx = Machine->gfx[1];
-
-	/* the last 0x10 bytes are control registers, not a sprite */
-	for (offs = 0;offs < 0x800-0x10;offs += 0x10)
-	{
-		if (priority_xlat[namcos1_spriteram[offs + 8]>>5&7] != priority) continue;
-
-		width =  sprite_sizemap[(namcos1_spriteram[offs + 4]>>6)&3];
-		height = sprite_sizemap[(namcos1_spriteram[offs + 8]>>1)&3];
-		flipx = ((namcos1_spriteram[offs + 4]>>5)&1) ^ flipscreen;
-		flipy = (namcos1_spriteram[offs + 8]&1) ^ flipscreen;
-		left = (namcos1_spriteram[offs + 4]&0x18) & (~(width-1));
-		top =  (namcos1_spriteram[offs + 8]&0x18) & (~(height-1));
-		code = ((namcos1_spriteram[offs + 4]&7)<<8) + namcos1_spriteram[offs + 5];
-		color = namcos1_spriteram[offs + 6]>>1;
-		flags = (color != 0x7f) ? TRANSPARENCY_PEN : TRANSPARENCY_PEN_TABLE;
-
-		/* sx */
-		sx = ((namcos1_spriteram[offs + 6]&1)<<8) + namcos1_spriteram[offs + 7];
-		sx += sprite_fixed_sx;
-
-		if(flipscreen) sx = 210 - sx - width;
-
-		if( sx > 480  ) sx -= 512;
-		if( sx < -32  ) sx += 512;
-		if( sx < -224 ) sx += 512;
-
-		/* sy */
-		sy = sprite_fixed_sy - namcos1_spriteram[offs + 9];
-
-		if(flipscreen) sy = 222 - sy;
-		else sy = sy - height;
-
-		if( sy > 224 ) sy -= 256;
-		if( sy < -32 ) sy += 256;
-
-		rect.min_x=sx;
-		rect.max_x=sx+(width-1);
-		rect.min_y=sy;
-		rect.max_y=sy+(height-1);
-
-		if (cliprect->min_x > rect.min_x) rect.min_x = cliprect->min_x;
-		if (cliprect->max_x < rect.max_x) rect.max_x = cliprect->max_x;
-		if (cliprect->min_y > rect.min_y) rect.min_y = cliprect->min_y;
-		if (cliprect->max_y < rect.max_y) rect.max_y = cliprect->max_y;
-
-		if (flipx) sx -= 32-width-left;
-		else sx -= left;
-		if (flipy) sy -= 32-height-top;
-		else sy -= top;
-
-		drawgfx(bitmap,gfx,
-				code,
-				color,
-				flipx,flipy,
-				sx,sy,
-				&rect,flags,0x0f);
-	}
-}
-#endif
-
-static void namcos1_draw_screen(struct mame_bitmap *bitmap, const struct rectangle *cliprect)
-{
-	int i, j, scrollx, scrolly, priority;
-
-	for (i=0; i<128; i++)
-	{
-		j = i << 4;
-		if (sprite_palette_state[i])
-		{
-			sprite_palette_state[i] = 0;
-			namcos1_palette_refresh(j, j, 15);
-		}
-	}
-
-	for (i=0; i<MAX_PLAYFIELDS; i++)
-	{
-		if (tilemap_palette_state[i])
-		{
-			tilemap_palette_state[i] = 0;
-			namcos1_palette_refresh((i<<8)+2048, (playfields[i].color<<8)+2048, 256);
-		}
-	}
-
-	for (i=0; i<4; i++)
-	{
-		j = i << 2;
-		scrollx = -( namcos1_playfield_control[j+1] + (namcos1_playfield_control[j+0]<<8) ) + scrolloffsX[i];
-		scrolly = -( namcos1_playfield_control[j+3] + (namcos1_playfield_control[j+2]<<8) ) + scrolloffsY[i];
-
-		if (flipscreen)
-		{
-			scrollx = -scrollx;
-			scrolly = -scrolly;
-		}
-
-		tilemap_set_scrollx(tilemap[i],0,scrollx);
-		tilemap_set_scrolly(tilemap[i],0,scrolly);
-	}
-
-#ifndef TRY_PDRAWGFX
-	fillbitmap(priority_bitmap, 0, cliprect);
-#endif
-
-	/* background color */
-	fillbitmap(bitmap, Machine->pens[BACKGROUNDCOLOR], cliprect);
-
-	/* bit 0-2 priority */
-	/* bit 3   disable	*/
-	for (i=0, priority=0; priority<=7; priority++)
-	{
-#ifdef TRY_PDRAWGFX
-		i = 1 << priority;
-#endif
-		// scroll maps are refreshed when f600 is called
-		if (namcos1_playfield_control[16] == priority) tilemap_draw(bitmap,cliprect,tilemap[0],0,i);
-		if (namcos1_playfield_control[17] == priority) tilemap_draw(bitmap,cliprect,tilemap[1],0,i);
-		if (namcos1_playfield_control[18] == priority) tilemap_draw(bitmap,cliprect,tilemap[2],0,i);
-		if (namcos1_playfield_control[19] == priority) tilemap_draw(bitmap,cliprect,tilemap[3],0,i);
-
-		// text maps should be refreshed independently regardless of interrupt status but due to
-		// priority constraints they be drawn here
-		if (namcos1_playfield_control[20] == priority) tilemap_draw(bitmap,cliprect,tilemap[4],0,i);
-		if (namcos1_playfield_control[21] == priority) tilemap_draw(bitmap,cliprect,tilemap[5],0,i);
-
-#ifndef TRY_PDRAWGFX
-		draw_sprites(bitmap, cliprect, sp_updatebuffer, priority);
-#endif
-	}
-
-#ifdef TRY_PDRAWGFX
-		draw_sprites(bitmap, cliprect, sp_updatebuffer);
-#endif
 }
 
 
@@ -582,8 +339,7 @@ VIDEO_START( namcos1 )
 	namcos1_controlram = memory_region(REGION_USER2) + 0x8000;
 
 	/* allocate videoram */
-	namcos1_videoram = auto_malloc(0x9000);
-	memset(namcos1_videoram, 0, 0x9000);
+	namcos1_videoram = auto_malloc(0x8000);
 
 	/* initialize playfields */
 	tilemap[0] = tilemap_create(background_get_info0,tilemap_scan_rows,TILEMAP_BITMASK,8,8,64,64);
@@ -593,8 +349,11 @@ VIDEO_START( namcos1 )
 	tilemap[4] = tilemap_create(foreground_get_info4,tilemap_scan_rows,TILEMAP_BITMASK,8,8,36,28);
 	tilemap[5] = tilemap_create(foreground_get_info5,tilemap_scan_rows,TILEMAP_BITMASK,8,8,36,28);
 
-	if (!tilemap[0] || !tilemap[1] || !tilemap[2] || !tilemap[3] || !tilemap[4] || !tilemap[5] || !namcos1_videoram)
+	if (!tilemap[0] || !tilemap[1] || !tilemap[2] || !tilemap[3] || !tilemap[4] || !tilemap[5]
+			|| !namcos1_videoram)
 		return 1;
+
+	memset(namcos1_videoram,0,0x8000);
 
 	namcos1_set_flipscreen(0);
 
@@ -609,118 +368,122 @@ VIDEO_START( namcos1 )
 		palette_shadow_table[Machine->pens[i+SPRITECOLORS]] = Machine->pens[i+SPRITECOLORS+TILECOLORS];
 	}
 
-	update_status = 0 | USE_SP_BUFFER;
-	idle_counter = 0;
-	idle_threshold = Machine->drv->frames_per_second / 2;
-
-	switch (namcos1_game_id) // custom settings
-	{
-/* use default
-		case 0x0487: // Youkai Douchuuki
-		case 0x0152: // Marchen Maze
-		case 0x0154: // World Stadium
-		case 0x0184: // World Stadium 89
-		case 0x0310: // World Stadium 90
-		case 0x0143: // World Court
-		case 0x0181: // Splatter House
-		case 0x1288: // Face Off
-		case 0xff90: // Puzzle Club
-		break;
-*/
-		case 0x0588: // Berabohm
-		case 0x0787: // Blazer
-		case 0x0311: // Soukoban DX
-			update_status |= UPDATE_TIED;
-		break;
-
-		case 0x0151: // Pacmania
-		case 0x0155: // Bakutotu
-		case 0x0153: // Galaga88
-		case 0x0987: // Quester
-		case 0x0183: // Blast Off
-		case 0x0308: // Dangerous Seed
-		case 0x0309: // Pistol Daimyo
-		case 0x0185: // Tank Force
-			update_status |= UPDATE_SUBLEAD;
-			update_status &= ~USE_SP_BUFFER;
-		break;
-
-		case 0x0136: // Dragon Spirit
-			priority_xlat[2] = 4;
-		break;
-
-		case 0x0182: // Rompers
-			priority_xlat[3] = 2;
-		break;
-	}
-
-	if (!(update_status & UPDATE_OVERRIDE))
-	{
-		if (!(update_status & UPDATE_SUBLEAD))
-		{
-			install_mem_write_handler(0, 0xf600, 0xf600, namcos1_main_update_w);
-			if (!(update_status & UPDATE_TIED) && update_status & USE_SP_BUFFER)
-				install_mem_write_handler(1, 0xf600, 0xf600, namcos1_sub_update_w);
-		}
-		else
-		{
-			install_mem_write_handler(1, 0xf600, 0xf600, namcos1_main_update_w);
-			if (!(update_status & UPDATE_TIED) && update_status & USE_SP_BUFFER)
-				install_mem_write_handler(0, 0xf600, 0xf600, namcos1_sub_update_w);
-		}
-	}
-
-	if (update_status & USE_SP_BUFFER)
-	{
-		sp_updatebuffer = namcos1_videoram + 0x8000;
-		sp_backbuffer = namcos1_videoram + 0x8800;
-	}
-	else
-		sp_updatebuffer = sp_backbuffer = &namcos1_controlram[0x800];
-
-#ifdef TRY_PDRAWGFX // there's not much information on priority masks and I'm not sure if this is right
-	for (i=0; i<8; i++) priority_xlat[i] = ~( ( 1 << (i+1) ) - 1 );
-#endif
-
 	return 0;
 }
 
-WRITE_HANDLER( namcos1_main_update_w )
+
+static void draw_sprites(struct mame_bitmap *bitmap,const struct rectangle *cliprect,int priority)
 {
-	idle_counter = 0;
+	int offs;
+	data8_t *namcos1_spriteram = &namcos1_controlram[0x0800];
 
-	if (update_status & MAIN_COMPLETE) return;
-	update_status |= MAIN_COMPLETE;
 
-	if (update_status & UPDATE_TIED && update_status & USE_SP_BUFFER)
-		memcpy(sp_backbuffer, &namcos1_controlram[0x800], 0x7f0); // take a snapshot of current sprite RAM
+	/* the last 0x10 bytes are control registers, not a sprite */
+	for (offs = 0;offs < 0x800-0x10;offs += 0x10)
+	{
+		static const int sprite_sizemap[4] = {16,8,32,4};
+		int sx,sy,code,color,flipx,flipy;
+		int width,height,left,top;
+		struct rectangle rect;
 
-	namcos1_draw_screen(Machine->scrbitmap, &Machine->visible_area);
-}
 
-WRITE_HANDLER( namcos1_sub_update_w )
-{
-	if (update_status & SUB_COMPLETE) return;
-	update_status |= SUB_COMPLETE;
+		if (((namcos1_spriteram[offs + 8]>>5)&7) != priority) continue;
 
-	memcpy(sp_backbuffer, &namcos1_controlram[0x800], 0x7f0); // take a snapshot of current sprite RAM
+		width =  sprite_sizemap[(namcos1_spriteram[offs + 4]>>6)&3];
+		height = sprite_sizemap[(namcos1_spriteram[offs + 8]>>1)&3];
+		flipx = ((namcos1_spriteram[offs + 4]>>5)&1) ^ flipscreen;
+		flipy = (namcos1_spriteram[offs + 8]&1) ^ flipscreen;
+		left = (namcos1_spriteram[offs + 4]&0x18) & (~(width-1));
+		top =  (namcos1_spriteram[offs + 8]&0x18) & (~(height-1));
+		code = (namcos1_spriteram[offs + 4]&7)*256 + namcos1_spriteram[offs + 5];
+		color = namcos1_spriteram[offs + 6]>>1;
+
+		/* sx */
+		sx = (namcos1_spriteram[offs + 6]&1)*256 + namcos1_spriteram[offs + 7];
+		sx += sprite_fixed_sx;
+
+		if(flipscreen) sx = 210 - sx - width;
+
+		if( sx > 480  ) sx -= 512;
+		if( sx < -32  ) sx += 512;
+		if( sx < -224 ) sx += 512;
+
+		/* sy */
+		sy = sprite_fixed_sy - namcos1_spriteram[offs + 9];
+
+		if(flipscreen) sy = 222 - sy;
+		else sy = sy - height;
+
+		if( sy > 224 ) sy -= 256;
+		if( sy < -32 ) sy += 256;
+
+		rect.min_x=sx;
+		rect.max_x=sx+(width-1);
+		rect.min_y=sy;
+		rect.max_y=sy+(height-1);
+
+		if (cliprect->min_x > rect.min_x) rect.min_x = cliprect->min_x;
+		if (cliprect->max_x < rect.max_x) rect.max_x = cliprect->max_x;
+		if (cliprect->min_y > rect.min_y) rect.min_y = cliprect->min_y;
+		if (cliprect->max_y < rect.max_y) rect.max_y = cliprect->max_y;
+
+		if (flipx) sx -= 32-width-left;
+		else sx -= left;
+		if (flipy) sy -= 32-height-top;
+		else sy -= top;
+
+		drawgfx(bitmap,Machine->gfx[1],
+				code,
+				color,
+				flipx,flipy,
+				sx,sy,
+				&rect,color == 0x7f ? TRANSPARENCY_PEN_TABLE : TRANSPARENCY_PEN,0x0f);
+	}
 }
 
 VIDEO_UPDATE( namcos1 )
 {
-	data8_t *temp;
+	int i,priority;
 
-	if (idle_counter < idle_threshold && !(update_status & UPDATE_OVERRIDE))
-	{
-		idle_counter++;
-		update_status &= ~(MAIN_COMPLETE | SUB_COMPLETE);
-	}
-	else
-	{
-		// draw screen unconditionally if video goes idle for too long(required unless priority bitmap is used)
-		if (update_status & USE_SP_BUFFER) memcpy(sp_backbuffer, &namcos1_controlram[0x800], 0x7f0);
-		namcos1_draw_screen(bitmap, cliprect);
+
+	/* update all tilemaps */
+	for(i=0;i<MAX_PLAYFIELDS;i++)
+		update_playfield(i);
+
+	for (i = 0;i < 128;i++)
+	{	/* sprite object */
+		if (sprite_palette_state[i])
+		{
+			namcos1_palette_refresh(16*i, 16*i, 15);
+			sprite_palette_state[i] = 0;
+		}
 	}
 
-	temp = sp_backbuffer; sp_backbuffer = sp_updatebuffer; sp_updatebuffer = temp; // mature backbuffer
+	for (i = 0;i < MAX_PLAYFIELDS;i++)
+	{	/* playfield object */
+		if (tilemap_palette_state[i])
+		{
+			namcos1_palette_refresh(128*16+256*i, 128*16+256*playfields[i].color, 256);
+			tilemap_palette_state[i] = 0;
+		}
+	}
+
+
+	/* background color */
+	fillbitmap(bitmap,Machine->pens[BACKGROUNDCOLOR],cliprect);
+
+	for (priority = 0;priority <= 7;priority++)
+	{
+		/* bit 0-2 priority */
+		/* bit 3   disable	*/
+		if (namcos1_playfield_control[16] == priority) tilemap_draw(bitmap,cliprect,tilemap[0],0,0);
+		if (namcos1_playfield_control[17] == priority) tilemap_draw(bitmap,cliprect,tilemap[1],0,0);
+		if (namcos1_playfield_control[18] == priority) tilemap_draw(bitmap,cliprect,tilemap[2],0,0);
+		if (namcos1_playfield_control[19] == priority) tilemap_draw(bitmap,cliprect,tilemap[3],0,0);
+		if (namcos1_playfield_control[20] == priority) tilemap_draw(bitmap,cliprect,tilemap[4],0,0);
+		if (namcos1_playfield_control[21] == priority) tilemap_draw(bitmap,cliprect,tilemap[5],0,0);
+
+		draw_sprites(bitmap,cliprect,priority);
+	}
 }
+
