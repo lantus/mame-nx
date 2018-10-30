@@ -253,7 +253,7 @@ namespace UI
                 }
 				else if(i == 2)
                 {
-                   DrawText(fntLarge, 450, 400, txtcolor, "Release 2.1 Ported by MVG in 2018");
+                   DrawText(fntLarge, 450, 400, txtcolor, "Release 2.2 Ported by MVG in 2018");
                 }
 				else if(i == 3)
                 {

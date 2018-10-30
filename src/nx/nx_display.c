@@ -52,7 +52,31 @@ static inline int VidGetTextureSize(int size)
 	return textureSize;
 }
 
+static void Helper_RenderDirect16( void *dest, struct mame_bitmap *bitmap, const struct rectangle *bnds )
+{
+	struct rectangle bounds = *bnds;
+	++bounds.max_x;
+	++bounds.max_y;
 
+	UINT16 *destBuffer;
+	UINT16 *sourceBuffer = (UINT16*)bitmap->base;
+  
+	destBuffer = (UINT16*)dest;
+ 
+	sourceBuffer += (bounds.min_y * bitmap->rowpixels) + bounds.min_x;
+    destBuffer += (g_OrigRenderWidth);
+	
+    UINT32 scanLen = (bounds.max_x - bounds.min_x) << 2;
+
+		for( UINT32 y = bounds.min_y; y < bounds.max_y; ++y )
+		{
+			memcpy( destBuffer, sourceBuffer, scanLen );
+			destBuffer += g_OrigRenderWidth;
+			sourceBuffer += bitmap->rowpixels;
+		}
+
+ 
+}
 
 
 static void Helper_RenderPalettized16( void *dest, struct mame_bitmap *bitmap, const struct rectangle *bnds )
@@ -79,7 +103,7 @@ static void Helper_RenderPalettized16( void *dest, struct mame_bitmap *bitmap, c
 			// Offset is in RGBX format	
 			*(offset++) = g_pal32Lookup[ *(sourceOffset++) ];
 		}
-
+		
 		destBuffer += g_OrigRenderWidth;
 		sourceBuffer += bitmap->rowpixels;
 		
@@ -249,14 +273,6 @@ static GLuint createAndCompileShader(GLenum type, const char* source)
     return handle;
 }
  
-float vertices[] = {
-    // positions          // colors           // texture coords
-     0.76f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 0.0f,   // top right
-     0.76f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f,   // bottom right
-    -0.76f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f,   // bottom left
-    -0.76f,  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 0.0f    // top left 
-};
-
 float rotvertices[] = {
     // positions          // colors           // texture coords
 	-0.4f,  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   1.0f, 0.0f,    // top left 
@@ -287,6 +303,14 @@ static GLuint s_tex;
 //---------------------------------------------------------------------
 int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_components )
 {	 
+ 
+	float vertices[] = {
+    // positions          // colors           // texture coords
+     0.76f*((float)(3.0f/params->aspect_y)),  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 0.0f,   // top right
+     0.76f*((float)(3.0f/params->aspect_y)), -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f,   // bottom right
+    -0.76f*((float)(3.0f/params->aspect_y)), -1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f,   // bottom left
+    -0.76f*((float)(3.0f/params->aspect_y)),  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 0.0f    // top left 
+	};
 
 	if (!s_display)
 		initEgl();
@@ -328,7 +352,7 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	
-	if (g_createParams.orientation  & ORIENTATION_FLIP_Y)
+	if (g_createParams.orientation  & ORIENTATION_FLIP_Y)	
 		glBufferData(GL_ARRAY_BUFFER, sizeof(rotvertices), rotvertices, GL_STATIC_DRAW);
 	else if (g_createParams.orientation  & ORIENTATION_FLIP_X)
 		glBufferData(GL_ARRAY_BUFFER, sizeof(rotvertices), rotvertices90, GL_STATIC_DRAW);	
@@ -362,19 +386,18 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 	glUseProgram(s_program);
  
 	set_ui_visarea( 0,0,0,0 );
- 	
-	if(Machine->color_depth == 16)
-	{
-      /* 32bpp only */
-		rgb_components[0] = 0x7C00;
-		rgb_components[1] = 0x03E0;
-		rgb_components[2] = 0x001F;  
-	}
-	else if(Machine->color_depth == 32)
+ 		
+	if(Machine->color_depth == 32)
 	{
 		rgb_components[0] = 0xFF0000;
 		rgb_components[1] = 0x00FF00;
 		rgb_components[2] = 0x0000FF;
+	}
+	else  
+	{       
+		rgb_components[0] = 0x7C00;
+		rgb_components[1] = 0x03E0;
+		rgb_components[2] = 0x001F;  
 	}
  
 	  // Store our original width and height
@@ -446,6 +469,8 @@ void osd_update_video_and_audio(struct mame_display *display)
 {
 	static cycles_t lastFrameEndTime = 0;
 	const struct performance_info *performance = mame_get_performance_info();
+	
+	
    
 	if( display->changed_flags & GAME_VISIBLE_AREA_CHANGED )
 	{
@@ -461,24 +486,29 @@ void osd_update_video_and_audio(struct mame_display *display)
 	{	
 		nx_UpdatePalette( display );
 	}
-	
+ 
 	
 	if( display->changed_flags & GAME_BITMAP_CHANGED )
 	{		  		 		 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
  
- 
-        if(display->game_bitmap->depth == 16)			
-        {            	
-	 		
+		if( g_createParams.video_attributes & VIDEO_RGB_DIRECT )
+		{			
+			Helper_RenderDirect16(pixels, display->game_bitmap, &display->game_bitmap_update );
+			
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_createParams.width, g_createParams.height, 0, GL_BGRA, GL_UNSIGNED_SHORT_1_5_5_5_REV, pixels);	
+	 
+		}
+		else
+		{
+			// Have to translate the colors through the palette lookup table			 
 			Helper_RenderPalettized16(pixels, display->game_bitmap, &display->game_bitmap_update );
 			
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_createParams.width, g_createParams.height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);	
-
 		}
-		 
-		
-  			                      
+  	
+
+		 		 	  		                  
 		// Wait out the remaining time for this frame
 		if( lastFrameEndTime &&         
 			performance->game_speed_percent >= 99.0f  )
