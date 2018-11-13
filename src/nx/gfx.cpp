@@ -55,10 +55,8 @@ typedef struct
     u8 data[];
 } ffnt_page_t;
 
-extern const ffnt_header_t InterUI14_nxfnt;
-extern const ffnt_header_t InterUI18_nxfnt;
-extern const ffnt_header_t InterUI20_nxfnt;
-extern const ffnt_header_t InterUI24_nxfnt;
+extern const ffnt_header_t interuiregular20_nxfnt;
+ 
 
 u8 bcolor(u32 src, u32 dst, u8 alpha)
 {
@@ -246,11 +244,8 @@ void Gfx::drawText(u32 X, u32 Y, string Text, Gfx::RGBA Color, u32 Size)
     clr.g = Color.G;
     clr.b = Color.B;
     clr.a = Color.A;
-    const ffnt_header_t* font = &InterUI18_nxfnt;
-    if(Size == 14) font = &InterUI14_nxfnt;
-    else if(Size == 18) font = &InterUI18_nxfnt;
-    else if(Size == 20) font = &InterUI20_nxfnt;
-    else if(Size == 24) font = &InterUI24_nxfnt;
+    const ffnt_header_t* font = &interuiregular20_nxfnt;
+   
 	 
     DrawText_(font, X, Y, clr, Text.c_str(), 0);
 }
