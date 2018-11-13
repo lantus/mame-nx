@@ -16,8 +16,10 @@
 #define GL_PROJECTION				0x1701
 #define GL_TEXTURE					0x1702
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
-static int nTextureWidth = 0;
+static int nTextureWidtssh = 0;
 static int nTextureHeight = 0;
 
 static INT32 frameCount = 0;
@@ -33,7 +35,9 @@ static int                        g_OrigRenderWidth;
 static int                        g_OrigRenderHeight;
  
 unsigned char pixels[100000];
- 
+unsigned char menupixels[0x384000];
+unsigned char *bg;
+
 //-----------------------------------------------------------------------------
 // EGL initialization
 //-----------------------------------------------------------------------------
@@ -247,6 +251,30 @@ void main()
 }
 )text";
 
+
+static const char* const fragmentMenuShaderSource = R"text(
+#version 330 core
+out vec4 FragColor;
+
+in vec3 ourColor;
+in vec2 TexCoord;
+
+// texture sampler
+uniform sampler2D texture1;
+uniform sampler2D texture2;
+
+void main()
+{
+	vec4 texel0, texel1, resultColor;
+	
+	texel0 = texture2D(texture1, TexCoord);
+    texel1 = texture2D(texture2, TexCoord);
+	
+	resultColor = mix(texel0, texel1, texel0.a);
+	FragColor = resultColor;
+}
+)text";
+
 static GLuint createAndCompileShader(GLenum type, const char* source)
 {
     GLint success;
@@ -286,7 +314,7 @@ float rotvertices90[] = {
 	 0.4f, -1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   1.0f, 0.0f,    // top left 
     -0.4f, -1.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // top right
     -0.4f,  1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   0.0f, 1.0f,   // bottom right
-     0.4f,   1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left    
+     0.4f,   1.0f, 0.0f,  0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left    
 };
  
 unsigned int indices[] = {  
@@ -295,9 +323,116 @@ unsigned int indices[] = {
 };
 	
 static GLuint s_program;
+static GLuint s_menuProgram;
 static unsigned int VBO, VAO, EBO;
+static unsigned int menuVBO, menuVAO, menuEBO;
 static GLuint s_tex;
+static GLuint texture1;
+static GLuint texture2;
  
+int menu_create_display()
+{
+ 
+	float vertices[] = {
+		// positions          // colors           // texture coords
+		 1.0f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 0.0f,   // top right
+		 1.0f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f,   // bottom right
+		-1.0f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f,   // bottom left
+		-1.0f,  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 0.0f    // top left 
+	};
+	// Load OpenGL routines using glad
+    gladLoadGL();
+
+	GLint vsh = createAndCompileShader(GL_VERTEX_SHADER, vertexShaderSource);
+    GLint fsh = createAndCompileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
+
+    s_menuProgram = glCreateProgram();
+    glAttachShader(s_menuProgram, vsh);
+    glAttachShader(s_menuProgram, fsh);
+    glLinkProgram(s_menuProgram);
+
+    GLint success;
+    glGetProgramiv(s_menuProgram, GL_LINK_STATUS, &success);
+    if (success == GL_FALSE)
+    {
+        char buf[512];
+        glGetProgramInfoLog(s_menuProgram, sizeof(buf), NULL, buf);
+        return EXIT_FAILURE;
+    }
+    glDeleteShader(vsh);
+    glDeleteShader(fsh);
+ 
+    glGenVertexArrays(1, &menuVAO);
+    glGenBuffers(1, &menuVBO);
+    glGenBuffers(1, &menuEBO);
+
+    glBindVertexArray(menuVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, menuVBO); 
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);		
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, menuEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    // position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    // texture coord attribute
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+ 
+	int width, height, nchan;
+ 
+	bg = stbi_load("romfs:/Graphics/mamelogo-nx.jpg", &width, &height, &nchan, 0);
+	 
+	glGenTextures(1, &texture1);	 
+    glBindTexture(GL_TEXTURE_2D, texture1);
+    // set the texture wrapping parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1280, 720, 0, GL_RGBA, GL_UNSIGNED_BYTE, menupixels); 
+	glUseProgram(s_menuProgram);
+ 
+}
+
+void menu_render()
+{ 
+ 
+}
+
+void menu_flush()
+{  
+    glClear(GL_COLOR_BUFFER_BIT); 
+    glBindTexture(GL_TEXTURE_2D, texture1);	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1280, 720, 0, GL_RGBA, GL_UNSIGNED_BYTE, menupixels);
+	glUseProgram(s_menuProgram);
+    glBindVertexArray(menuVAO);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	eglSwapBuffers(s_display, s_surface); 
+}
+
+void menu_cleanup()
+{
+	
+	if (bg)
+	{
+		stbi_image_free(bg);
+		bg = NULL;
+	}
+ 
+	glDeleteBuffers(1, &menuVBO);
+    glDeleteBuffers(1, &menuEBO); 	
+    glDeleteVertexArrays(1, &menuVAO);   
+	glDeleteProgram(s_menuProgram);
+	
+	deinitEgl();
+}
+
 //---------------------------------------------------------------------
 //	osd_create_display
 //---------------------------------------------------------------------
@@ -311,10 +446,7 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
     -0.76f*((float)(3.0f/params->aspect_y)), -1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f,   // bottom left
     -0.76f*((float)(3.0f/params->aspect_y)),  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 0.0f    // top left 
 	};
-
-	if (!s_display)
-		initEgl();
-	
+ 
 	// Store the creation params
 	memcpy( &g_createParams, params, sizeof(g_createParams) );
 
@@ -403,34 +535,6 @@ int osd_create_display( const struct osd_create_params *params, UINT32 *rgb_comp
 	  // Store our original width and height
 	g_OrigRenderWidth  = g_createParams.width;
 	g_OrigRenderHeight = g_createParams.height;
-	
-	nTextureWidth =  VidGetTextureSize(g_createParams.width);
-	nTextureHeight =  VidGetTextureSize(g_createParams.height);
- 	
- 		
-	const float vidScrnAspect = (float)1280.0 / 720.0;
-	const float gameAspect = (float)g_createParams.aspect_x/g_createParams.aspect_y;
-	
-	float newWidth, newHeight;
-	
-	newWidth = fabs(g_createParams.width*gameAspect);
-	newHeight = g_createParams.height;
-	
-	if((newWidth - floor(newWidth) > 0.5))
-		newx = ceil(newWidth);
-	else 
-		newx = floor(newWidth);
-	
-	if ((newHeight - floor(newHeight) > 0.5))
-		newy = ceil(newHeight);
-	else 
-		newy = floor(newHeight);
-	 
-	offsetx = ceil(newx - g_createParams.width)/2;
-	offsety = 0;
-	
-	newx = newx - (newx % 4);
-	newy = newy - (newy % 4);
  
   
 	return 0;
@@ -446,12 +550,9 @@ void osd_close_display(void)
 	
 	glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO); 	
-    glDeleteVertexArrays(1, &VAO);    
+    glDeleteVertexArrays(1, &VAO);    	
 	glDeleteProgram(s_program);
-	
-	//deinitEgl();
-		 
- 	
+ 	 
 }
 
 //---------------------------------------------------------------------

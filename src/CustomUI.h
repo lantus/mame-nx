@@ -7,23 +7,19 @@
 using namespace std;
 
 #include <switch.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL2_gfxPrimitives.h> 
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_mixer.h>
-#include <SDL2/SDL_ttf.h>
 #include "nx_romlist.h"
+#include "gfx.hpp"
 
 
 extern "C" {
 #include "osd_cpu.h"
 #include "driver.h"
-#include "mame.h"
+#include "mame.h" 
 
  
 bool initEgl();
 void deinitEgl();
-
+ 
 }
 
 
@@ -39,8 +35,7 @@ const int GAMESEL_WindowMiddle = 8;
 
 static bool bGLInited = false;
 int MenuState;
-SDL_Renderer *menu_render;
-TTF_Font *menuFntLarge;
+ 
 
 
 float fGameSelect;
@@ -67,18 +62,8 @@ namespace UI
 	int optRed,optGreen,optBlue,optAlpha;
 	
 	char RomCountText[60];
-    static SDL_Window *sdl_wnd;
-    static SDL_Surface *sdl_surf;
-    static SDL_Renderer *sdl_render;
-    static TTF_Font *fntLarge;
-    static TTF_Font *fntMedium;
-    static TTF_Font *fntSmall;
-     
-
-    static string Back;
-    static SDL_Color txtcolor;
-    static SDL_Surface *sdls_Back;
-    static SDL_Texture *sdlt_Back;
+    
+    static string Back; 
     static int TitleX = 60;
     static int TitleY = 235;
     static int Opt1X = 55;
@@ -93,68 +78,12 @@ namespace UI
     static int vol = 64;
     static string curfilename = ":nofile:";
     static string curfile = ":nofile:";
-
-	
-    SDL_Surface *InitSurface(string Path)
-    {
-        SDL_Surface *srf = IMG_Load(Path.c_str());
-        if(srf)
-        {
-            Uint32 colorkey = SDL_MapRGB(srf->format, 0, 0, 0);
-            SDL_SetColorKey(srf, SDL_TRUE, colorkey);
-        }
-        return srf;
-    }
-
-    SDL_Texture *InitTexture(SDL_Surface *surf)
-    {
-        SDL_Texture *tex = SDL_CreateTextureFromSurface(sdl_render, surf);
-        return tex;
-    }
-
-    void DrawText(TTF_Font *font, int x, int y, SDL_Color colour, const char *text)
-    {
-        SDL_Surface *surface = TTF_RenderText_Blended_Wrapped(font, text, colour, 1280);
-        SDL_SetSurfaceAlphaMod(surface, 255);
-        SDL_Rect position = { x, y, surface->w, surface->h };
-        SDL_BlitSurface(surface, NULL, sdl_surf, &position);
-        SDL_FreeSurface(surface);
-    }
-
-    void DrawRect(int x, int y, int w, int h, SDL_Color colour)
-    {
-        SDL_Rect rect;
-        rect.x = x; rect.y = y; rect.w = w; rect.h = h;
-        SDL_SetRenderDrawColor(sdl_render, colour.r, colour.g, colour.b, colour.a);
-        SDL_RenderFillRect(sdl_render, &rect);
-    }
-
-    void DrawBackXY(SDL_Surface *surf, SDL_Texture *tex, int x, int y)
-    {
-        SDL_Rect position;
-        position.x = x;
-        position.y = y;
-        position.w = surf->w;
-        position.h = surf->h;
-        SDL_RenderCopy(sdl_render, tex, NULL, &position);
-    }
-
-    void DrawBack(SDL_Surface *surf, SDL_Texture *tex)
-    {
-        DrawBackXY(surf, tex, 0, 0);	
-    }
-
+ 
     void Exit()
     {
-        TTF_Quit();
-        IMG_Quit();         
-        SDL_DestroyRenderer(sdl_render);
-        SDL_FreeSurface(sdl_surf);
-        SDL_DestroyWindow(sdl_wnd);
- 
-        SDL_Quit();		
-        romfsExit();
-        exit(0);
+	   Gfx::exit();
+       romfsExit();
+       exit(0);
     }
 
     void Draw()
@@ -163,9 +92,8 @@ namespace UI
 		int	iTempGameSel;
 		int	iGameidx;
 	
-        SDL_RenderClear(sdl_render);
-        DrawBack(sdls_Back, sdlt_Back);
-     
+		Gfx::drawBgImage();
+
         int ox = Opt1X;
         int oy = Opt1Y;
         for(int i = 0; i < optionsvec.size(); i++)
@@ -207,14 +135,13 @@ namespace UI
 					dr = 0; dg = 0; db = -1;
 				} 
 				
-                DrawText(fntLarge, ox, oy, { 140, 255, 255, 255 }, optionsvec[i].c_str());
+				Gfx::drawText(ox,oy, optionsvec[i].c_str() , { selBlue, selGreen, selRed, 255 } , 20);	 
                 
 				if(i == 0)
                 {
                     int fx = 450;
                     int fy = 235;
-					 
-					
+ 
 					// draw	game list entries
 
 					iGameSelect	= fGameSelect;
@@ -222,7 +149,10 @@ namespace UI
 					iTempGameSel = iGameSelect;
 
 					if (iNumGames == 0)	
-						DrawText(fntLarge, fx, 202, txtcolor, "No Roms Found");	 
+					{
+						Gfx::drawText( fx, 202, "No Roms Found", { 255, 255, 255, 255 }, 20);	 
+						 
+					}
 					for	(iGameidx=0; iGameidx<iMaxWindowList;	iGameidx++)
 					{
 						
@@ -231,14 +161,13 @@ namespace UI
 
 
 						if (iGameidx==iCursorPos){
-							 
-							DrawText(fntLarge, fx, fy + (28*iGameidx), { selRed, selGreen, selBlue, 255 }, currentName);
-							
+							 							 
+							Gfx::drawText(fx,fy + (28*iGameidx) , currentName,  { selRed, selGreen, selBlue, 255 }, 20);
 							currentGame = currentName; 
 						}
 						else
-						{
-							DrawText(fntLarge, fx, fy + (28*iGameidx), txtcolor, currentName);
+						{							 
+							Gfx::drawText(fx,fy + (28*iGameidx) , currentName,  { 255, 255, 255, 255 }, 20);
 						}
 
 					}
@@ -247,24 +176,30 @@ namespace UI
                 }
                 else if(i == 1)
                 {
-					//DrawText(fntLarge, 450, 400, txtcolor, "Rotate Vertical Games");
-					//DrawText(fntLarge, 450, 420, txtcolor, "Keep Aspect Ratio");
+ 
+					Gfx::drawText(450, 400,"No Options Yet", { 255, 255, 255, 255 }, 20);
+					 
                      
                 }
 				else if(i == 2)
                 {
-                   DrawText(fntLarge, 450, 400, txtcolor, "Release 2.2 Ported by MVG in 2018");
+                   Gfx::drawText(450, 400,"Release 2.2 Ported by MVG in 2018", { 255, 255, 255, 255 }, 20);
+				    				  
                 }
 				else if(i == 3)
                 {
                    
                 }
             }
-            else DrawText(fntLarge, ox, oy, txtcolor, optionsvec[i].c_str());
+            else{
+				 			
+				Gfx::drawText(ox,oy, optionsvec[i].c_str(),  { 255, 255, 255, 255 }, 20);
+			}
             oy += 50;
         }
-        DrawText(fntLarge, TitleX, 672, txtcolor, RomCountText);
-        SDL_RenderPresent(sdl_render);
+        	 
+		Gfx::drawText(TitleX,672, RomCountText,  { 255, 255, 255, 255 }, 20);
+       
     }
     
     void Loop()
@@ -489,9 +424,7 @@ namespace UI
 			Draw();
 			
         }
-		
-		
-		
+ 
         if(k & KEY_LSTICK_UP)
         {
             if(selected > 0) selected -= 1;
@@ -523,9 +456,9 @@ namespace UI
 			//{ 
 			//	case 0:
 					int gameIndex = mapRoms[currentGame]; 
-					SDL_SetRenderDrawColor(sdl_render, 0, 0, 0, 255);
-					SDL_RenderClear(sdl_render);
-					 
+ 
+					Gfx::clear({ 0, 0, 0, 0 });	
+
 					options.ui_orientation = drivers[gameIndex]->flags & ORIENTATION_MASK;
 
 					if( options.ui_orientation & ORIENTATION_SWAP_XY )
@@ -536,19 +469,8 @@ namespace UI
 						options.ui_orientation ^= ROT180;
 					}
 										 				
-					run_game(gameIndex);					 
-										 
-					SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);		
-					SDL_RenderClear(sdl_render);					
-					//break;
-				//case 1:
-				
-					
-				
-					//break;
-					
-			//}
-			
+					run_game(gameIndex);	
+					 				
 			Draw();
         }
         else if(k & KEY_B)
@@ -556,6 +478,7 @@ namespace UI
             Draw();
         }
         else if(k & KEY_PLUS || k & KEY_MINUS) Exit();
+ 
     }
 	
  
@@ -571,29 +494,20 @@ namespace UI
 		iCursorPos = 0;
 	
         romfsInit();
+
+		initEgl();
+
+		Gfx::init();
+		
         ColorSetId id;
         setsysInitialize();
         setsysGetColorSetId(&id);
-        Back = "romfs:/Graphics/mamelogo-nx.png";
-        txtcolor = { 255, 255, 255, 255 };
+
         setsysExit();
-        SDL_Init(SDL_INIT_EVERYTHING);
-        SDL_CreateWindowAndRenderer(1280, 720, 0, &sdl_wnd, &sdl_render);
-        sdl_surf = SDL_GetWindowSurface(sdl_wnd);
-        SDL_SetRenderDrawBlendMode(sdl_render, SDL_BLENDMODE_BLEND);
-        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2");
-        IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
-        TTF_Init();
-        SDL_SetRenderDrawColor(sdl_render, 255, 255, 255, 255);
-       
-        fntLarge = TTF_OpenFont("romfs:/Fonts/NintendoStandard.ttf", 25);
-        fntMedium = TTF_OpenFont("romfs:/Fonts/NintendoStandard.ttf", 20);
-        fntSmall = TTF_OpenFont("romfs:/Fonts/NintendoStandard.ttf", 10);
 		
-		menuFntLarge = fntLarge;
+		//Gfx::drawBgImage();
+		Gfx::flush();
 		
-        sdls_Back = InitSurface(Back);
-        sdlt_Back = InitTexture(sdls_Back);
         optionsvec.push_back("Playable ROM(s)");
         optionsvec.push_back("Options");
 		optionsvec.push_back("About mame-nx");
@@ -621,7 +535,7 @@ namespace UI
 		selBlue = 0;
 		selAlpha = 255;		
 		
-		menu_render = sdl_render;
+	 
 		
         Draw();
     }

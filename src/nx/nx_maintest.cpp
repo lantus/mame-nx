@@ -1,7 +1,9 @@
-
+ 
 // Include the only file
 #include "CustomUI.h"
 #include "nx_RomList.h"
+
+
 
 extern "C" {
 #include "osd_cpu.h"
@@ -24,7 +26,6 @@ int main()
  
 	options.rotateVertical = true;
 	options.samplerate = 48000;
-	options.use_samples = true;
 	
 	options.use_filter = false;
 	
@@ -38,8 +39,9 @@ int main()
 	options.artwork_crop = false;	
 	
     while(appletMainLoop())
-    {
+    {			 
         UI::Loop();
+		Gfx::flush();
     }
  
     UI::Exit();
@@ -48,23 +50,20 @@ int main()
 }
 
 extern "C" void RenderMessage(char *name)
-{
-	SDL_SetRenderDrawColor(UI::sdl_render, 0, 0, 0, 255);
-	SDL_RenderClear(UI::sdl_render);
-	UI::DrawText(UI::fntLarge, 300, 360, UI::txtcolor, name);
-	SDL_RenderPresent(UI::sdl_render);		
-
-	SDL_Delay(5000);
+{ 	 
+	Gfx::drawBgImage();	 
+	Gfx::drawText(300,360, name,  { 255, 255, 255, 255 }, 20);
+	Gfx::flush();
 }
 
 
 extern "C" void RenderProgress(const char *name, struct rom_load_data *romdata)
 {
-	SDL_SetRenderDrawColor(UI::sdl_render, 0, 0, 0, 255);
-	SDL_RenderClear(UI::sdl_render);
  
 	char title[128];
-	 
+
+	Gfx::drawBgImage();
+
 	if( name )
 	{
 		sprintf( title, "Loading \"%s\"",name );		 
@@ -72,7 +71,9 @@ extern "C" void RenderProgress(const char *name, struct rom_load_data *romdata)
 	}
 	else
 		strcpy( title, "Loading complete!" );
- 
-	UI::DrawText(UI::fntLarge, 420, 360, UI::txtcolor, title);
-	SDL_RenderPresent(UI::sdl_render);			
+ 	
+	
+	Gfx::drawText(420,360, title,  { 255, 255, 255, 255 }, 20);
+	Gfx::flush();
+ 	
 }

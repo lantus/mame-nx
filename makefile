@@ -150,7 +150,7 @@ DEFS = -DALIGN_SHORTS -DALIGN_INTS -DLSB_FIRST -DINLINE="static __inline__" -DSW
 
 CFLAGS = -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
 CXXFLAGS = -Isrc -Isrc/includes -Isrc/$(MAMEOS) -I$(OBJ)/cpu/m68000 -Isrc/cpu/m68000 -I$(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
-CXXFLAGS += -DNDEBUG \
+CXXFLAGS += -DNDEBUG `freetype-config --cflags`\
 	$(ARCH) -w -O3 -fomit-frame-pointer -fstrict-aliasing \
 	-Wall -Wno-sign-compare -Wunused \
 	-Wpointer-arith -Wcast-align -Waggregate-return \
@@ -164,7 +164,7 @@ CXXFLAGS += -DNDEBUG \
 ifdef SYMBOLS
 CFLAGS += -O0 -Wall -Werror -Wno-unused -g
 else
-CFLAGS += -DNDEBUG \
+CFLAGS += -DNDEBUG `freetype-config --cflags` \
 	$(ARCH) -w -O3 -fomit-frame-pointer -fstrict-aliasing \
 	-Wall -Wno-sign-compare -Wunused \
 	-Wpointer-arith -Wbad-function-cast -Wcast-align -Waggregate-return \
@@ -191,7 +191,7 @@ MAPFLAGS =
 endif
 
 # platform .mak files will want to add to this
-LIBS = -lfreetype -lSDL2_ttf -lSDL2_gfx -lSDL2_image -lpng -ljpeg `sdl2-config --libs` `freetype-config --libs` -lz  -lglad -lEGL -lglapi -ldrm_nouveau -lnx -lm
+LIBS = -lfreetype `freetype-config --libs` -lz  -lglad -lEGL -lglapi -ldrm_nouveau -lnx -lm
 
 OBJDIRS = obj $(OBJ) $(OBJ)/cpu $(OBJ)/sound $(OBJ)/$(MAMEOS) \
 	$(OBJ)/drivers $(OBJ)/machine $(OBJ)/vidhrdw $(OBJ)/sndhrdw
@@ -229,12 +229,15 @@ extra:	$(TOOLS) $(TEXTS)
 # combine the various definitions to one
 CDEFS = $(DEFS) $(COREDEFS) $(CPUDEFS) $(SOUNDDEFS) $(ASMDEFS) $(DBGDEFS)
  
+$(OBJ)/nx/gfx.o : src/nx/gfx.cpp 	
+	$(CXX) $(CDEFS) $(CXXFLAGS) -c src/nx/gfx.cpp -o $(OBJ)/nx/gfx.o
+	
 $(OBJ)/nx/nx_maintest.o: src/nx/nx_maintest.cpp 
 	$(CXX) $(CDEFS) $(CXXFLAGS) -c src/nx/nx_maintest.cpp -o $(OBJ)/nx/nx_maintest.o
 	
 $(OBJ)/nx/nx_romlist.o : src/nx/nx_romlist.cpp 	
 	$(CXX) $(CDEFS) $(CXXFLAGS) -c src/nx/nx_romlist.cpp -o $(OBJ)/nx/nx_romlist.o 
-
+ 
 # primary target
 $(EMULATOR): $(OBJS) $(COREOBJS) $(OSOBJS) $(DRVLIBS) 
 # always recompile the version string
