@@ -206,7 +206,7 @@ void DrawText_(const ffnt_header_t* font, u32 x, u32 y, color_t clr, const char*
 }
 
 void Gfx::init()
-{ 
+{ 	
 	menu_create_display();
 	Gfx::Framebuffer = menupixels;
 	Gfx::FrameWidth = 1280;
@@ -264,5 +264,5 @@ void Gfx::clear(Gfx::RGBA Color)
 void Gfx::exit()
 {
 	menu_cleanup();
-    gfxExit();
+    //gfxExit();
 }

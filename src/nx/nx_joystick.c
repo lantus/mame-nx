@@ -11,7 +11,7 @@
 #include "nx_mame.h" 
 #include <switch.h> 
  
-#define ANALOG_AS_DIGITAL_DEADZONE	100
+#define ANALOG_AS_DIGITAL_DEADZONE	4096
  
 static struct JoystickInfo		g_joystickInfo[128] = {0,0,0};
 static UINT32                   g_calibrationStep = 0;
@@ -139,15 +139,6 @@ int osd_is_joy_pressed( int joycode )
 					return (buttons & KEY_RSTICK);						
 			}
 			break;
-
-		case JT_DPAD_UP:
-			return (buttons & KEY_DUP);
-		case JT_DPAD_DOWN:
-			return (buttons & KEY_DDOWN);
-		case JT_DPAD_LEFT:
-			return (buttons & KEY_DLEFT);
-		case JT_DPAD_RIGHT:
-			return (buttons & KEY_DRIGHT);
 			
 		case JT_LSTICK_UP:
 			return (pos_left.dy > ANALOG_AS_DIGITAL_DEADZONE );
@@ -166,6 +157,16 @@ int osd_is_joy_pressed( int joycode )
 			return (pos_right.dx  < -ANALOG_AS_DIGITAL_DEADZONE );
 		case JT_RSTICK_RIGHT:
 			return (pos_right.dx  > ANALOG_AS_DIGITAL_DEADZONE ); 
+
+		case JT_DPAD_UP:
+			return (buttons & KEY_DUP) || (pos_left.dy > ANALOG_AS_DIGITAL_DEADZONE );
+		case JT_DPAD_DOWN:
+			return (buttons & KEY_DDOWN) ||  (pos_left.dy < -ANALOG_AS_DIGITAL_DEADZONE );
+		case JT_DPAD_LEFT:
+			return (buttons & KEY_DLEFT) || (pos_left.dx < -ANALOG_AS_DIGITAL_DEADZONE );
+		case JT_DPAD_RIGHT:
+			return (buttons & KEY_DRIGHT) || (pos_left.dx > ANALOG_AS_DIGITAL_DEADZONE );
+			
 
 	}
 	

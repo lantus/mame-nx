@@ -15,14 +15,8 @@ extern "C" {
 #include "osd_cpu.h"
 #include "driver.h"
 #include "mame.h" 
-
- 
-bool initEgl();
-void deinitEgl();
- 
 }
-
-
+ 
 #define	GAMESELECT 1
 #define	CONFIGSCREEN 2
  
@@ -62,6 +56,7 @@ namespace UI
 	int optRed,optGreen,optBlue,optAlpha;
 	
 	char RomCountText[60];
+	char CPUSpeed[60];
     
     static string Back; 
     static int TitleX = 60;
@@ -183,7 +178,7 @@ namespace UI
                 }
 				else if(i == 2)
                 {
-                   Gfx::drawText(450, 400,"Release 2.2 Ported by MVG in 2018", { 255, 255, 255, 255 }, 20);
+                   Gfx::drawText(450, 400,"Release 2.3 Ported by MVG in 2020", { 255, 255, 255, 255 }, 20);
 				    				  
                 }
 				else if(i == 3)
@@ -199,6 +194,7 @@ namespace UI
         }
         	 
 		Gfx::drawText(TitleX,672, RomCountText,  { 255, 255, 255, 255 }, 20);
+		Gfx::drawText(TitleX+450,20, CPUSpeed,  { 255, 255, 255, 255 }, 20);
        
     }
     
@@ -486,6 +482,8 @@ namespace UI
 
     void Init()
     {
+		 
+		uint32_t cpuSpeed;
 		MenuState = GAMESELECT;
 		
 		fGameSelect	= 0.0f;
@@ -494,14 +492,13 @@ namespace UI
 		iCursorPos = 0;
 	
         romfsInit();
-
-		initEgl();
-
+ 
+	 
 		Gfx::init();
 		
-        ColorSetId id;
-        setsysInitialize();
-        setsysGetColorSetId(&id);
+        //ColorSetId id;
+        //setsysInitialize();
+        //setsysGetColorSetId(&id);
 
         setsysExit();
 		
@@ -513,8 +510,12 @@ namespace UI
 		optionsvec.push_back("About mame-nx");
 		optionsvec.push_back("Quit");
          
-		sprintf(RomCountText,"%d/%d Games Found",romList.AvRoms(), romList.totalMAMEGames);	 
+		//pcvGetClockRate(PcvModule_Cpu , &cpuSpeed);
+		 
+		//1220000000
 		
+		sprintf(RomCountText,"%d/%d Games Found",romList.AvRoms(), romList.totalMAMEGames);	 
+		//sprintf(CPUSpeed, "Switch Frequency %ld Hz", (cpuSpeed));
 		
 		iNumGames =	romList.AvRoms();
 

@@ -1,4 +1,4 @@
- 
+ #include<switch.h>
 // Include the only file
 #include "CustomUI.h"
 #include "nx_RomList.h"
@@ -17,7 +17,8 @@ CRomList romList;
  
 int main()
 {	
-	socketInitializeDefault();
+	//socketInitializeDefault();
+	//pcvInitialize();
 	 	
 	romList.InitRomList();
 	romList.RefreshRomList();

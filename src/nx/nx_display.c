@@ -16,6 +16,7 @@
 #define GL_PROJECTION				0x1701
 #define GL_TEXTURE					0x1702
 
+#define GLM_FORCE_PURE
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -116,7 +117,7 @@ static void Helper_RenderPalettized16( void *dest, struct mame_bitmap *bitmap, c
  
 }
 
-bool initEgl()
+bool initEgl(NWindow *win)
 {
     // Connect to the EGL default display
 	
@@ -137,16 +138,21 @@ bool initEgl()
         goto _fail1;
     }
 
-    // Get an appropriate EGL framebuffer configuration
+     // Get an appropriate EGL framebuffer configuration
     EGLConfig config;
     EGLint numConfigs;
     static const EGLint framebufferAttributeList[] =
     {
-        EGL_RED_SIZE, 1,
-        EGL_GREEN_SIZE, 1,
-        EGL_BLUE_SIZE, 1,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+        EGL_RED_SIZE,     8,
+        EGL_GREEN_SIZE,   8,
+        EGL_BLUE_SIZE,    8,
+        EGL_ALPHA_SIZE,   8,
+        EGL_DEPTH_SIZE,   24,
+        EGL_STENCIL_SIZE, 8,
         EGL_NONE
     };
+	
     eglChooseConfig(s_display, framebufferAttributeList, &config, 1, &numConfigs);
     if (numConfigs == 0)
     {
@@ -155,7 +161,7 @@ bool initEgl()
     }
 
     // Create an EGL window surface
-    s_surface = eglCreateWindowSurface(s_display, config, (char*)"", NULL);
+    s_surface = eglCreateWindowSurface(s_display, config, win, NULL);
     if (!s_surface)
     {
         //TRACE("Surface creation failed! error: %d", eglGetError());
@@ -341,6 +347,9 @@ int menu_create_display()
 		-1.0f,  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 0.0f    // top left 
 	};
 	// Load OpenGL routines using glad
+	
+	initEgl(nwindowGetDefault());
+	
     gladLoadGL();
 
 	GLint vsh = createAndCompileShader(GL_VERTEX_SHADER, vertexShaderSource);

@@ -952,6 +952,7 @@ const struct RomModule *rom_next_chunk(const struct RomModule *romp)
 void CLIB_DECL debugload(const char *string, ...)
 {
  
+/* 
 	static int opened;
 	va_list arg;
 	FILE *f;
@@ -964,7 +965,7 @@ void CLIB_DECL debugload(const char *string, ...)
 		va_end(arg);
 		fclose(f);
 	}
- 
+ */
 }
 
 

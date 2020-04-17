@@ -87,7 +87,7 @@ int osd_update_audio_stream(INT16 *buffer)
             {      
 				audioPtr->released_count = 0;
 				if (R_FAILED(audoutWaitPlayFinish(	&audioPtr->released_buffer,
-													&audioPtr->released_count, U64_MAX)))
+													&audioPtr->released_count, UINT64_MAX)))
                 {
                  
                 }
