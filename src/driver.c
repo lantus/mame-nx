@@ -2502,9 +2502,9 @@ TESTDRIVER( drivedge )	/* (c) 1994 Strata/Incredible Technologies */
 	/* Sega System 1 / System 2 games */
 	DRIVER( starjack )	/* 834-5191 (c) 1983 (S1) */
 	DRIVER( starjacs )	/* (c) 1983 Stern (S1) */
-	DRIVER( regulus )	/* 834-5328 (c) 1983 (S1) */
-	DRIVER( reguluso )	/* 834-5328 (c) 1983 (S1) */
-	DRIVER( regulusu )	/* 834-5328 (c) 1983 (S1) */
+	DRIVER( regulus )	/* 834-5328Â (c) 1983 (S1) */
+	DRIVER( reguluso )	/* 834-5328Â (c) 1983 (S1) */
+	DRIVER( regulusu )	/* 834-5328Â (c) 1983 (S1) */
 	DRIVER( upndown )	/* (c) 1983 (S1) */
 	DRIVER( upndownu )	/* (c) 1983 (S1) */
 	DRIVER( mrviking )	/* 834-5383 (c) 1984 (S1) */
@@ -2636,8 +2636,6 @@ TESTDRIVER( ryukyu )	/* (protected) */
 TESTDRIVER( suprleag )  /* (protected) */
 TESTDRIVER( thndrbld )	/* (protected) */
 TESTDRIVER( thndrbdj )  /* (protected?) */
-TESTDRIVER( toutrun )	/* (protected) */
-TESTDRIVER( toutruna )	/* (protected) */
 
 	// Working
 	DRIVER( aburner )	/* (c) 1987 */
@@ -2689,6 +2687,8 @@ TESTDRIVER( toutruna )	/* (protected) */
 	DRIVER( tetrisbl )	/* (c) 1988 (but bootleg) */
 	DRIVER( timscanr )	/* (c) 1987 */
 	DRIVER( toryumon )	/* (c) 1995 */
+	DRIVER( toutrun )	/* (c) 1989 */
+        DRIVER( toutrun3 )	/* (c) 1989 */
 	DRIVER( tturf )		/* (c) 1989 Sega / Sunsoft */
 	DRIVER( tturfbl )	/* (c) 1989 (Datsu bootleg) */
 	DRIVER( tturfu )	/* (c) 1989 Sega / Sunsoft */
