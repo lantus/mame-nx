@@ -2621,8 +2621,8 @@ TESTDRIVER( spcpostn )	/* (c) 1986 Sega / Nasco" */
 	DRIVER( wb3a )		/* (c) 1988 Sega / Westone (protected) */
 
 TESTDRIVER( aceattac )	/* (protected) */
-TESTDRIVER( afighter )	/* (protected) */
-	DRIVER( bloxeed )	/* (protected) */
+    DRIVER( afighter )	/* (protected) */
+    DRIVER( bloxeed )	/* (protected) */
 TESTDRIVER( cltchitr )	/* (protected) */
 TESTDRIVER( cotton )	/* (protected) */
 TESTDRIVER( cottona )	/* (protected) */
@@ -2639,7 +2639,8 @@ TESTDRIVER( thndrbdj )  /* (protected?) */
 
 	// Working
 	DRIVER( aburner )	/* (c) 1987 */
-	DRIVER( aburner2 )  /* (c) 1987 */
+	DRIVER( aburner2 )      /* (c) 1987 */
+	DRIVER( afightera )	/* (c) 1986 (Unprotected) */
 	DRIVER( alexkida )	/* (c) 1986 */
 	DRIVER( aliensyn )	/* (c) 1987 */
 	DRIVER( altbeas2 )	/* (c) 1988 */
@@ -2695,6 +2696,7 @@ TESTDRIVER( thndrbdj )  /* (protected?) */
 	DRIVER( wb3 )		/* (c) 1988 Sega / Westone */
 	DRIVER( wb3bl )		/* (c) 1988 Sega / Westone (but bootleg) */
 	DRIVER( wrestwar )	/* (c) 1989 */
+	DRIVER( fantzn2x )      /* (c) 2008 Sega / M2 */
 
 /*
 Sega System 24 game list
