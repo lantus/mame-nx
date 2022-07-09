@@ -219,7 +219,7 @@ READ16_HANDLER( sys16_tileram_r ){
 	Each sprite has 4 levels of priority, specifying where they are placed between bg(lo) and text.
 */
 
-static void draw_sprite(
+static void draw_sprite( //*
 	struct mame_bitmap *bitmap,
 	const struct rectangle *cliprect,
 	const unsigned char *addr, int pitch,
@@ -229,13 +229,20 @@ static void draw_sprite(
 	int flipx, int flipy,
 	int priority,
 	int shadow,
-	int shadow_pen)
+	int shadow_pen, int eos )
 {
 	const pen_t *shadow_base = Machine->gfx[0]->colortable + (Machine->drv->total_colors/2);
-	int dx,dy;
+	const UINT8 *source;
 	int full_shadow=shadow&SYS16_SPR_SHADOW;
 	int partial_shadow=shadow&SYS16_SPR_PARTIAL_SHADOW;
 	int shadow_mask=(Machine->drv->total_colors/2)-1;
+	int sx, x, xcount;
+	int sy, y, ycount = 0;
+	int dx,dy;
+	UINT16 *dest;
+	UINT8 *pri;
+	unsigned pen, data;
+
 	priority = 1<<priority;
 	if (!strcmp(Machine->gamedrv->name,"sonicbom")) flipy^=0x80; // temp hack until we fix drawing
 
@@ -255,33 +262,26 @@ static void draw_sprite(
 		dx = 1;
 	}
 
+	if (!eos)
 	{
-		int sy = y0;
-		int y;
-		int ycount = 0;
-		for( y=0; y<height; y++ ){
+		sy = y0;
+		for( y=height; y; y-- ){
 			ycount += screen_height;
 			while( ycount>=height ){
 				if( sy>=cliprect->min_y && sy<=cliprect->max_y ){
-					const UINT8 *source = addr;
-					UINT16 *dest = (UINT16 *)bitmap->line[sy];
-					UINT8 *pri = priority_bitmap->line[sy];
-
-					int sx = x0;
-					int x;
-					int xcount = 0;
-					for( x=0; x<width; x+=2 ){
-						UINT8 data = *source++; /* next 2 pixels */
-
-						// breaks outrun, since those sprites are drawn from right to left
-						//if( data==0x0f ) break;
-
+					source = addr;
+					dest = (UINT16 *)bitmap->line[sy];
+					pri = priority_bitmap->line[sy];
+					sx = x0;
+					xcount = 0;
+					for( x=width; x; x-=2 ){
+						data = (unsigned)*source++; /* next 2 pixels */
+						pen = data>>4;
 						xcount += screen_width;
 						while( xcount>=width )
 						{
-							int pen = data>>4;
-							if( pen!=0x0 && pen!=0xf && sx>=cliprect->min_x && sx<=cliprect->max_x ){
-								if( (pri[sx]&priority)==0 ){
+							if( pen && pen!=0xf && sx>=cliprect->min_x && sx<=cliprect->max_x ){
+								if(!(pri[sx]&priority)){
 									if (full_shadow)
 										dest[sx] = shadow_base[dest[sx]&shadow_mask];
 									else if (partial_shadow && pen==shadow_pen)
@@ -293,12 +293,12 @@ static void draw_sprite(
 							xcount -= width;
 							sx+=dx;
 						}
+						pen = data&0xf;
 						xcount += screen_width;
 						while( xcount>=width )
 						{
-							int pen = data&0xf;
-							if(  pen!=0x0 && pen!=0xf && sx>=cliprect->min_x && sx<=cliprect->max_x ){
-								if( (pri[sx]&priority)==0 ){
+							if( pen && pen!=0xf && sx>=cliprect->min_x && sx<=cliprect->max_x ){
+								if(!(pri[sx]&priority)){
 									if (full_shadow)
 										dest[sx] = shadow_base[dest[sx]&shadow_mask];
 									else if (partial_shadow && pen==shadow_pen)
@@ -318,87 +318,146 @@ static void draw_sprite(
 			addr += pitch;
 		}
 	}
+	else
+	{
+		sy = y0;
+		for( y=height; y; y-- ){
+			ycount += screen_height;
+			while( ycount>=height ){
+				if( sy>=cliprect->min_y && sy<=cliprect->max_y ){
+					source = addr;
+					dest = (UINT16 *)bitmap->line[sy];
+					pri = priority_bitmap->line[sy];
+					sx = x0;
+					xcount = 0;
+					for( x=width; x; x-=2 ){
+						data = (unsigned)*source++; /* next 2 pixels */
+						pen = data>>4;
+						if (pen==0xf) break;
+						xcount += screen_width;
+						while( xcount>=width )
+						{
+							if( pen && pen!=0xf && sx>=cliprect->min_x && sx<=cliprect->max_x )
+								if(!(pri[sx]&priority)) dest[sx] = paldata[pen];
+							xcount -= width;
+							sx+=dx;
+						}
+						pen = data&0xf;
+						xcount += screen_width;
+						while( xcount>=width )
+						{
+							if( pen && pen!=0xf && sx>=cliprect->min_x && sx<=cliprect->max_x )
+								if(!(pri[sx]&priority)) dest[sx] = paldata[pen];
+							xcount -= width;
+							sx+=dx;
+						}
+					}
+				}
+				ycount -= height;
+				sy+=dy;
+			}
+			addr += pitch;
+		}
+	}
 }
 
-static void draw_sprites( struct mame_bitmap *bitmap, const struct rectangle *cliprect, int b3d )
+static void draw_sprites( struct mame_bitmap *bitmap, const struct rectangle *cliprect, int b3d ) //*
 {
 	const pen_t *base_pal = Machine->gfx[0]->colortable;
 	const unsigned char *base_gfx = memory_region(REGION_GFX2);
-	int gfx_rom_size=memory_region_length(REGION_GFX2);
-
-	struct sys16_sprite_attributes sprite;
+	const int gfx_rom_size = memory_region_length(REGION_GFX2);
 	const data16_t *source = sys16_spriteram;
-	int i;
-	memset( &sprite, 0x00, sizeof(sprite) );
-	for( i=0; i<num_sprites; i++ ){
+	struct sys16_sprite_attributes sprite;
+	int xpos, ypos, screen_width, width, logical_height, pitch, flipy, flipx;
+	int i, mod_h, mod_x, eos;
+	unsigned gfx;
+
+	memset(&sprite, 0x00, sizeof(sprite));
+
+	for(i=0; i<num_sprites; i++)
+	{
 		sprite.flags = 0;
-		if( sys16_spritesystem( &sprite, source,0 ) ) return; /* end-of-spritelist */
-		if( sprite.flags & SYS16_SPR_VISIBLE ){
-			int xpos = sprite.x;
-			int ypos = sprite.y;
-			int gfx = sprite.gfx;
-			int screen_width;
-			int width;
-			int logical_height;
-			int pitch = sprite.pitch;
-			int flipy = pitch&0x80;
-			int flipx = sprite.flags&SYS16_SPR_FLIPX;
+		if (sys16_spritesystem(&sprite, source, 0)) return; /* end-of-spritelist */
+		source += 8;
 
-			width = pitch&0x7f;
-			if( pitch&0x80 ) width = 0x80-width;
-			width *= 4;
+		if( sprite.flags & SYS16_SPR_VISIBLE )
+		{
+			xpos = sprite.x;
+			flipx = sprite.flags & SYS16_SPR_FLIPX;
+			ypos = sprite.y;
+			pitch = sprite.pitch;
+			flipy = pitch & 0x80;
+			width = pitch & 0x7f;
+			if (pitch & 0x80) width = 0x80 - width;
+			pitch = width << 1;
+			width <<= 2;
+			eos = 0;
 
-			if( sys16_spritesystem==sys16_sprite_sharrier ){
-				logical_height = ((sprite.screen_height)<<4|0xf)*(0x400+sprite.zoomy)/0x4000;
-				if( flipx ) gfx += 2;
-			}
-			else if( b3d ){ // outrun/aburner
-				logical_height = ((sprite.screen_height<<4)|0xf)*sprite.zoomy/0x2000;
-				if( flipx ) gfx += 2;
-			}
-			else {
-				logical_height = sprite.screen_height*(0x400+sprite.zoomy)/0x400;
-			}
-
-			if( flipx ) gfx += 2; else gfx += width/2;
-			if( flipy ) gfx -= logical_height*width/2;
-
-			pitch = width/2;
-			if( width==0 ){
-				width = 512;// used by fantasy zone for laser
-			}
-
-			if( b3d ){ /* outrun, afterburner, ... */
+			if( b3d ) // outrun/aburner
+			{
+				if (b3d == 2) eos = 1;
+				if (xpos < 0 && flipx) continue;
+				if (ypos >= 240) ypos -= 256;
+				sprite.screen_height++;
+				logical_height = (sprite.screen_height<<4)*sprite.zoomy/0x2000;
 				screen_width = width*0x200/sprite.zoomx;
-				if( sprite.flags & SYS16_SPR_DRAW_TO_TOP ){
+
+				if (flipx && flipy) { mod_h = -logical_height;   mod_x = 4; }
+				else if     (flipx) { mod_h = -1; xpos++;        mod_x = 4; }
+				else if     (flipy) { mod_h = -logical_height;   mod_x = 0; }
+				else                { mod_h = 0;                 mod_x = 0; }
+
+				if( sprite.flags & SYS16_SPR_DRAW_TO_TOP )
+				{
 					ypos -= sprite.screen_height;
 					flipy = !flipy;
 				}
-				if( sprite.flags & SYS16_SPR_DRAW_TO_LEFT ){
+
+				if( sprite.flags & SYS16_SPR_DRAW_TO_LEFT )
+				{
 					xpos -= screen_width;
 					flipx = !flipx;
 				}
 			}
-			else {
+			else if( sys16_spritesystem==sys16_sprite_sharrier )
+			{
+				logical_height = (sprite.screen_height<<4)*(0x400+sprite.zoomy)/0x4000;
 				screen_width = width*(0x800-sprite.zoomx)/0x800;
+
+				if (flipx && flipy) { mod_h = -logical_height-1; mod_x = 4; }
+				else if     (flipx) { mod_h = 0;                 mod_x = 4; }
+				else if     (flipy) { mod_h = -logical_height;   mod_x = 0; }
+				else                { mod_h = 1;                 mod_x = 0; }
+			}
+			else
+			{
+				if (!width) { width = 512; eos = 1; } // used by fantasy zone for laser
+				screen_width = width;
+				logical_height = sprite.screen_height;
+
+				if (sprite.zoomy) logical_height = logical_height*(0x400 + sprite.zoomy)/0x400 - 1;
+				if (sprite.zoomx) screen_width = screen_width*(0x800 - sprite.zoomx)/0x800 + 2;
+
+				if (flipx && flipy) { mod_h = -logical_height-1; mod_x = 2; }
+				else if     (flipx) { mod_h = 0;                 mod_x = 2; }
+				else if     (flipy) { mod_h = -logical_height;   mod_x = 0; }
+				else                { mod_h = 1;                 mod_x = 0; }
 			}
 
-			if (gfx>=gfx_rom_size)
-				gfx%=gfx_rom_size;
+			gfx = sprite.gfx + pitch * mod_h + mod_x;
+			if (gfx >= gfx_rom_size) gfx %= gfx_rom_size;
 
 			draw_sprite(
 				bitmap,cliprect,
 				base_gfx + gfx, pitch,
-				base_pal + sprite.color*16,
+				base_pal + (sprite.color<<4),
 				xpos, ypos, screen_width, sprite.screen_height,
 				width, logical_height,
 				flipx, flipy,
 				sprite.priority,
 				sprite.flags,
-				sprite.shadow_pen
-			);
+				sprite.shadow_pen, eos);
 		}
-		source+=8;
 	}
 }
 
@@ -457,19 +516,19 @@ WRITE16_HANDLER( sys16_paletteram_w ){
 				(b << 3) | (b >> 2) /* 5 bits blue */
 			);
 #else
-		{
+		{   extern struct GameDriver driver_aburner, driver_aburner2; //JUN
 			r=(r << 3) | (r >> 2); /* 5 bits red */
 			g=(g << 2) | (g >> 4); /* 6 bits green */
 			b=(b << 3) | (b >> 2); /* 5 bits blue */
 
 			palette_set_color( offset,r,g,b);
-
+			if (Machine->gamedrv != &driver_aburner && Machine->gamedrv != &driver_aburner2) { //JUN
 			/* shadow color */
 			r= r * 160 / 256;
 			g= g * 160 / 256;
 			b= b * 160 / 256;
 
-			palette_set_color( offset+Machine->drv->total_colors/2,r,g,b);
+			palette_set_color( offset+Machine->drv->total_colors/2,r,g,b); }
 		}
 #endif
 	}
@@ -606,6 +665,10 @@ static void get_fg_tile_info( int offset ){
 
 	case 3:
 		tile_info.priority = ((data&0xff00) >= sys16_fg_priority_value)?1:0;
+		break;
+		
+	case 4: // action fighter
+        tile_info.priority = ((data/0x1000) % 2 != 0)?1:0;
 		break;
 
 	default:
@@ -1848,7 +1911,7 @@ VIDEO_UPDATE( aburner ){
 	tilemap_draw( bitmap,cliprect, foreground, 1, 7 );
 
 	tilemap_draw( bitmap,cliprect, text_layer, 0, 7 );
-	draw_sprites( bitmap,cliprect, 1 );
+	draw_sprites( bitmap,cliprect, 2 );
 
 //	debug_draw( bitmap,cliprect, 8,8,sys16_roadram[0x1000] );
 }
