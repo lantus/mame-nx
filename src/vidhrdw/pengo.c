@@ -191,7 +191,15 @@ WRITE_HANDLER( pengo_flipscreen_w )
 	}
 }
 
-
+WRITE_HANDLER( mspactwin_videoram_w )
+{
+	if (videoram[offset] != data)
+	{
+		dirtybuffer[offset] = 1;
+		videoram[offset] = data;
+		force_partial_update(cpu_getscanline());
+	}
+}
 
 /***************************************************************************
 
