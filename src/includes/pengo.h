@@ -19,3 +19,5 @@ VIDEO_UPDATE( pengo );
 
 WRITE_HANDLER( vanvan_bgcolor_w );
 VIDEO_UPDATE( vanvan );
+
+WRITE_HANDLER( mspactwin_videoram_w );
