@@ -177,7 +177,7 @@ Dave Widel
 #include "pengo.h"
 
 
-
+static UINT8 *decrypted_opcodes;
 static UINT8 speedcheat = 0;	/* a well known hack allows to make Pac Man run at four times */
 								/* his usual speed. When we start the emulation, we check if the */
 								/* hack can be applied, and set this flag accordingly. */
@@ -235,6 +235,47 @@ MACHINE_INIT( piranha )
 		speedcheat = 1;
 	else
 	speedcheat = 0;
+}
+
+
+MACHINE_INIT( mspactwin )
+{
+	static UINT8 firstrun = 0;
+	static UINT8 *decrypted_opcodes; 
+	static UINT8 data_holder[0xc000];
+
+	if (!firstrun)
+	{
+		UINT8 *rom = memory_region(REGION_CPU1);
+		int A;
+
+		decrypted_opcodes = data_holder; /* auto_malloc(0xc000); */
+		for (A = 0x0000; A < 0x4000; A+=2) {
+
+			/* decode opcode */
+			decrypted_opcodes     [A  ] = BITSWAP8(rom[       A  ]       , 4, 5, 6, 7, 0, 1, 2, 3);
+			decrypted_opcodes     [A+1] = BITSWAP8(rom[       A+1] ^ 0x9A, 6, 4, 5, 7, 2, 0, 3, 1);
+			decrypted_opcodes[0x8000+A  ] = BITSWAP8(rom[0x8000+A  ]       , 4, 5, 6, 7, 0, 1, 2, 3);
+			decrypted_opcodes[0x8000+A+1] = BITSWAP8(rom[0x8000+A+1] ^ 0x9A, 6, 4, 5, 7, 2, 0, 3, 1);
+
+			/* decode operand */
+			rom[       A  ] = BITSWAP8(rom[       A  ]       , 0, 1, 2, 3, 4, 5, 6, 7);
+			rom[       A+1] = BITSWAP8(rom[       A+1] ^ 0xA3, 2, 4, 6, 3, 7, 0, 5, 1);
+			rom[0x8000+A  ] = BITSWAP8(rom[0x8000+A  ]       , 0, 1, 2, 3, 4, 5, 6, 7);
+			rom[0x8000+A+1] = BITSWAP8(rom[0x8000+A+1] ^ 0xA3, 2, 4, 6, 3, 7, 0, 5, 1);
+		}
+
+		for (A = 0x0000; A < 0x2000; A++) {
+
+			decrypted_opcodes[0x6000+A] = decrypted_opcodes[A+0x2000];
+			rom[0x6000+A  ] = BITSWAP8(rom[0x6000+A  ]       , 0, 1, 2, 3, 4, 5, 6, 7);
+			rom[0x6000+A+1] = BITSWAP8(rom[0x6000+A+1] ^ 0xA3, 2, 4, 6, 3, 7, 0, 5, 1);
+		}
+		firstrun=1;
+		memory_set_opcode_base(0,decrypted_opcodes);
+	}
+	else
+	memory_set_opcode_base(0,decrypted_opcodes);
 }
 
 /*************************************
@@ -314,6 +355,11 @@ static INTERRUPT_GEN( mspacman_interrupt )
 		}
 	}
 
+	irq0_line_hold();
+}
+
+static INTERRUPT_GEN( mspactwin_interrupt )
+{
 	irq0_line_hold();
 }
 
@@ -650,6 +696,44 @@ static MEMORY_WRITE_START( mspacman_writemem )
 MEMORY_END
 
 
+static MEMORY_READ_START( mspactwin_readmem )
+	{ 0x0000, 0x1fff, MRA_ROM },
+	{ 0x2000, 0x3fff, MRA_ROM },
+	{ 0x4000, 0x47ff, MRA_RAM },	/* video and color RAM */
+	{ 0x4c00, 0x4fff, MRA_RAM },	/* including sprite codes at 4ff0-4fff */
+	{ 0x5000, 0x5000, input_port_0_r },	/* IN0 */
+	{ 0x5040, 0x5040, input_port_1_r },	/* IN1 */
+	{ 0x5080, 0x50bf, input_port_4_r },	/* DSW1 */
+/*	{ 0x50c0, 0x50c0, input_port_4_r }, should be sublatch read */
+    { 0x8000, 0xbffe, MRA_ROM }, 
+	{ 0x8000, 0xbfff, MRA_ROM },
+MEMORY_END
+
+
+static MEMORY_WRITE_START( mspactwin_writemem )
+	{ 0x0000, 0x1fff, MWA_ROM },
+	{ 0x2000, 0x3fff, MWA_ROM },
+	{ 0x4000, 0x43ff, mspactwin_videoram_w, &videoram, &videoram_size },
+	{ 0x4400, 0x47ff, colorram_w, &colorram },
+	{ 0x4c00, 0x4fef, MWA_RAM },
+	{ 0x4ff0, 0x4fff, MWA_RAM, &spriteram, &spriteram_size },
+	{ 0x5000, 0x5000, interrupt_enable_w },
+	{ 0x5001, 0x5001, pengo_sound_enable_w },
+	{ 0x5002, 0x5002, MWA_NOP },
+	{ 0x5003, 0x5003, pengo_flipscreen_w },
+ 	{ 0x5004, 0x5005, pacman_leds_w },
+	{ 0x5006, 0x5006, mspacman_activate_rom },	/* Not actually, just handy */
+ 	{ 0x5007, 0x5007, pacman_coin_counter_w },
+	{ 0x5040, 0x505f, pengo_sound_w, &pengo_soundregs },
+	{ 0x5060, 0x506f, MWA_RAM, &spriteram_2 },
+	{ 0x50c0, 0x50c0, watchdog_reset_w },
+	{ 0x8000, 0xbffe, MWA_ROM },
+	{ 0x8000, 0xbfff, MWA_ROM },	/* Ms. Pac-Man / Ponpoko only */
+	{ 0xc000, 0xc3ff, mspactwin_videoram_w }, /* mirror address for video ram, */
+	{ 0xc400, 0xc7ef, colorram_w }, /* used to display HIGH SCORE and CREDITS */
+MEMORY_END
+
+
 static MEMORY_READ_START( alibaba_readmem )
 	{ 0x0000, 0x3fff, MRA_ROM },
 	{ 0x4000, 0x47ff, MRA_RAM },	/* video and color RAM */
@@ -912,6 +996,61 @@ INPUT_PORTS_START( mspacman )
 	PORT_BITX(    0x01, 0x00, IPT_DIPSWITCH_NAME | IPF_CHEAT, "Speedup Cheat", KEYCODE_LCONTROL, JOYCODE_1_BUTTON1 )
 	PORT_DIPSETTING(    0x00, DEF_STR( Off ) )
 	PORT_DIPSETTING(    0x01, DEF_STR( On ) )
+INPUT_PORTS_END
+
+
+INPUT_PORTS_START( mspactwin )
+	PORT_START	/* IN0 */
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_JOYSTICK_UP | IPF_4WAY  )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT | IPF_4WAY  )
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_JOYSTICK_RIGHT | IPF_4WAY  )
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN | IPF_4WAY  )
+	PORT_BIT( 0x0f, IP_ACTIVE_LOW, IPT_SPECIAL )
+	PORT_DIPNAME( 0x10, 0x10, "Jama" )
+	PORT_DIPSETTING(    0x10, "Slow" )
+	PORT_DIPSETTING(    0x00, "Fast" )
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_COIN1 )
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_COIN2 )
+	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_SERVICE1 )
+
+	PORT_START	/* IN1 */
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_JOYSTICK_UP | IPF_4WAY | IPF_COCKTAIL )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT | IPF_4WAY | IPF_COCKTAIL )
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_JOYSTICK_RIGHT | IPF_4WAY | IPF_COCKTAIL )
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN | IPF_4WAY | IPF_COCKTAIL )
+	PORT_BIT( 0x0f, IP_ACTIVE_LOW, IPT_SPECIAL )
+	PORT_SERVICE( 0x10, IP_ACTIVE_LOW )
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_START1 )
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_START2 )
+	PORT_DIPNAME( 0x80, 0x80, "Skip Screen" )       /* Used to skip level */
+	PORT_DIPSETTING(    0x80, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
+
+	/* multiplexed player inputs */
+	PORT_START	/* P1 */
+	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START	/* P2 */
+	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START	/* DSW1 */
+	PORT_DIPNAME( 0x03, 0x01, DEF_STR( Coinage ) )
+	PORT_DIPSETTING(    0x03, DEF_STR( 2C_1C ) )
+	PORT_DIPSETTING(    0x01, DEF_STR( 1C_1C ) )
+	PORT_DIPSETTING(    0x02, DEF_STR( 1C_2C ) )
+	PORT_DIPSETTING(    0x00, "Free Play (Invalid)" ) /* causes watchdog reset at title screen, see comments above */
+	PORT_SERVICE( 0x08, IP_ACTIVE_LOW )
+	PORT_DIPNAME( 0x0C, 0x08, DEF_STR( Lives ) )
+	PORT_DIPSETTING(    0x00, "1" )
+	PORT_DIPSETTING(    0x04, "2" )
+	PORT_DIPSETTING(    0x08, "3" )
+	PORT_DIPSETTING(    0x0C, "5" )
+	PORT_DIPNAME( 0x30, 0x00, DEF_STR( Bonus_Life ) )
+	PORT_DIPSETTING(    0x00, "10000" )
+	PORT_DIPSETTING(    0x10, "15000" )
+	PORT_DIPSETTING(    0x20, "20000" )
+	PORT_DIPSETTING(    0x30, "None"  )
+	PORT_BIT( 0xc0, IP_ACTIVE_LOW, IPT_UNUSED )
 INPUT_PORTS_END
 
 
@@ -2053,6 +2192,31 @@ static struct GfxLayout spritelayout =
 };
 
 
+static struct GfxLayout mspactwin_tilelayout =
+{
+	8,8,    /* 8*8 characters */
+	RGN_FRAC(1,2),    /* 256 characters */
+	2,  /* 2 bits per pixel */
+	{ 0, 4 },   /* the two bitplanes for 4 pixels are packed into one byte */
+	{ 8*8+0, 8*8+1, 8*8+2, 8*8+3, 0, 1, 2, 3 }, /* bits are packed in groups of four */
+	{ 0*8, 1*8, 2*8, 3*8, 4*8, 5*8, 6*8, 7*8 },
+	16*8    /* every char takes 16 bytes */
+};
+
+
+static struct GfxLayout mspactwin_spritelayout =
+{
+	16,16,  /* 16*16 sprites */
+	RGN_FRAC(1,2),  /* 64 sprites */
+	2,  /* 2 bits per pixel */
+	{ 0, 4 },   /* the two bitplanes for 4 pixels are packed into one byte */
+	{ 8*8, 8*8+1, 8*8+2, 8*8+3, 16*8+0, 16*8+1, 16*8+2, 16*8+3,
+			24*8+0, 24*8+1, 24*8+2, 24*8+3, 0, 1, 2, 3 },
+	{ 0*8, 1*8, 2*8, 3*8, 4*8, 5*8, 6*8, 7*8,
+			32*8, 33*8, 34*8, 35*8, 36*8, 37*8, 38*8, 39*8 },
+	64*8    /* every sprite takes 64 bytes */
+};
+
 static struct GfxDecodeInfo gfxdecodeinfo[] =
 {
 	{ REGION_GFX1, 0, &tilelayout,   0, 32 },
@@ -2069,6 +2233,12 @@ static struct GfxDecodeInfo mschampgfxdecodeinfo[] =
 };
 
 
+static struct GfxDecodeInfo mspactwin_gfxdecodeinfo[] =
+{
+   { REGION_GFX1, 0x0000, &mspactwin_tilelayout,   0, 32 },
+   { REGION_GFX1, 0x1000, &mspactwin_spritelayout, 0, 32 },
+   { -1 } /* end of array */
+};
 
 /*************************************
  *
@@ -2163,6 +2333,19 @@ static MACHINE_DRIVER_START( mspacman )
 	MDRV_CPU_VBLANK_INT(mspacman_interrupt,1)
 
 	MDRV_MACHINE_INIT(mspacman)
+MACHINE_DRIVER_END
+
+static MACHINE_DRIVER_START( mspactwin )
+
+	/* basic machine hardware */
+	MDRV_IMPORT_FROM(pacman)
+
+	MDRV_CPU_MODIFY("main")
+	MDRV_CPU_MEMORY(mspactwin_readmem,mspactwin_writemem)
+	MDRV_CPU_VBLANK_INT(mspactwin_interrupt,1)
+
+	MDRV_MACHINE_INIT(mspactwin)
+	MDRV_GFXDECODE(mspactwin_gfxdecodeinfo)
 MACHINE_DRIVER_END
 
 
@@ -2800,6 +2983,27 @@ ROM_START( mschamp )
 ROM_END
 
 
+ROM_START( mspactwin )
+	ROM_REGION( 2*0x20000, REGION_CPU1, 0 )	/* 64k for encrypted code */
+	ROM_LOAD( "m27256.bin",  0x0000, 0x4000, CRC(77a99184) SHA1(9dcb1a1b78994aa401d653bec571cb3e6f9d900b) )
+	ROM_CONTINUE(0x8000,0x4000)
+
+	ROM_REGION( 0x2000, REGION_GFX1, 0 )
+	ROM_LOAD( "4__2716.5d",  0x0000, 0x0800, CRC(483c1d1c) SHA1(d3b967c6a71cf02b825d800f56d5268f2e0e60eb) )
+	ROM_LOAD( "2__2716.5g",  0x0800, 0x0800, CRC(c08d73a2) SHA1(072e57641ac5ae3c47b4f8d9c55e3da5b35489ea) )
+	ROM_LOAD( "3__2516.5f",  0x1000, 0x0800, CRC(22b0188a) SHA1(a9ed9ca8b36a60081fd364abc9bc23963932cc0b) )
+	ROM_LOAD( "1__2516.5j",  0x1800, 0x0800, CRC(0a8c46a0) SHA1(e38e9e3258ab26fcbc6fdf258844e364f4b165ab) )
+
+	ROM_REGION( 0x0120, REGION_PROMS, 0 )
+	ROM_LOAD( "mb7051.8h",   0x0000, 0x0020, CRC(ff344446) SHA1(45eb37533da8912645a089b014f3b3384702114a) )
+	ROM_LOAD( "82s129.4a",   0x0020, 0x0100, CRC(a8202d0d) SHA1(2a615211c33f3ef75af14e4bbedd2a700100be29) )
+
+	ROM_REGION( 0x0200, REGION_SOUND1, 0 )	/* Sound PROMs */
+	ROM_LOAD( "82s126.1m",   0x0000, 0x0100, CRC(a9cc86bf) SHA1(bbcec0570aeceb582ff8238a4bc8546a23430081) )
+	ROM_LOAD( "82s126.3m",   0x0100, 0x0100, CRC(77245b66) SHA1(0c4d0bee858b97632411c440bea6948a74759746) )
+ROM_END
+
+
 ROM_START( crush )
 	ROM_REGION( 2*0x10000, REGION_CPU1, 0 )	/* 64k for code + 64k for opcode copy to hack protection */
 	ROM_LOAD( "crushkrl.6e",  0x0000, 0x1000, CRC(a8dd8f54) SHA1(4e3a973ea74a9e145c6997513b98fc80aa478442) )
@@ -3300,13 +3504,17 @@ ROM_START( alibaba )
 	ROM_LOAD( "5f",           0x0000, 0x0800, CRC(b5715c86) SHA1(ed6aee778295b0182d32846b5e41776b5b15420c) )
 	ROM_LOAD( "5k",           0x0800, 0x0800, CRC(713086b3) SHA1(a1609bae637207a82920678f05bcc10a5ff096de) )
 
-	ROM_REGION( 0x0120, REGION_PROMS, 0 )
-	ROM_LOAD( "alibaba.7f",   0x0000, 0x0020, NO_DUMP )  /* missing */
-	ROM_LOAD( "alibaba.4a",   0x0020, 0x0100, NO_DUMP )
-
+	ROM_REGION( 0x0120, REGION_PROMS, 0 ) /* Colours */
+	ROM_LOAD( "82s123.e7",    0x0000, 0x0020, CRC(2fc650bd) SHA1(8d0268dee78e47c712202b0ec4f1f51109b1f2a5) )
+	ROM_LOAD( "82s129.a4",    0x0020, 0x0100, CRC(3eb3a8e4) SHA1(19097b5f60d1030f8b82d9f1d3a241f93e5c75d6) )
+	
 	ROM_REGION( 0x0200, REGION_SOUND1, 0 )	/* sound PROMs */
 	ROM_LOAD( "82s126.1m",    0x0000, 0x0100, CRC(a9cc86bf) SHA1(bbcec0570aeceb582ff8238a4bc8546a23430081) )
 	ROM_LOAD( "82s126.3m",    0x0100, 0x0100, CRC(77245b66) SHA1(0c4d0bee858b97632411c440bea6948a74759746) )	/* timing - not used */
+	
+	/* unknown, used for the mystery items ? */
+	ROM_REGION( 0x1000, REGION_USER1, 0 )
+	ROM_LOAD( "ab7.bin",      0x0000, 0x0800, CRC(52294ef5) SHA1(1d76e16c95cb2873d898a4151a902113fccafe1c) )
 ROM_END
 
 
@@ -3703,6 +3911,7 @@ GAME( 1981, nmouse,   0	     ,  nmouse ,  nmouse,   eyes,     ROT90,  "Amenip (P
 GAME( 1981, nmouseb,  nmouse ,  nmouse ,  nmouse,   eyes,     ROT90,  "Amenip Nova Games Ltd.", "Naughty Mouse (set 2)" )
 GAME( 1982, pacplus,  0,        pacplus,  pacman,   pacplus,  ROT90,  "[Namco] (Midway license)", "Pac-Man Plus" )
 GAME( 1981, mspacman, 0,        mspacman, mspacman, 0,        ROT90,  "Midway", "Ms. Pac-Man" )
+GAME( 1992, mspactwin, 0,        mspactwin, mspactwin, 0,        ROT90,  "SUSILU", "Ms. Pac-Man Twin (Argentina)" )
 GAME( 1981, mspacmab, mspacman, pacman,   mspacman, 0,        ROT90,  "bootleg", "Ms. Pac-Man (bootleg)" )
 GAME( 1981, mspacmat, mspacman, mspacman, mspacman, 0,        ROT90,  "hack", "Ms. Pac Attack" )
 GAME( 1981, mspacpls, mspacman, mspacpls, mspacpls, 0,        ROT90,  "hack", "Ms. Pac-Man Plus" )
@@ -3730,8 +3939,7 @@ GAME( 1982, dremshpr, 0,        dremshpr, dremshpr, 0,        ROT270, "Sanritsu"
 GAME( 1983, acitya,   bwcasino, acitya,   acitya,   0,        ROT90,  "Epos Corporation", "Atlantic City Action" )
 GAME( 1983, vanvan,   0,        vanvan,   vanvan,   0,        ROT270, "Sanritsu", "Van-Van Car" )
 GAME( 1983, vanvank,  vanvan,   vanvan,   vanvank,  0,        ROT270, "Karateco", "Van-Van Car (Karateco)" )
-GAMEX(1982, alibaba,  0,        alibaba,  alibaba,  0,        ROT90,  "Sega", "Ali Baba and 40 Thieves", GAME_WRONG_COLORS | GAME_UNEMULATED_PROTECTION )
+GAMEX(1982, alibaba,  0,        alibaba,  alibaba,  0,        ROT90,  "Sega", "Ali Baba and 40 Thieves", GAME_UNEMULATED_PROTECTION )
 GAME( 1985, jumpshot, 0,        pacman,   jumpshot, jumpshot, ROT90,  "Bally Midway", "Jump Shot" )
 GAME( 1985, shootbul, 0,        pacman,   shootbul, jumpshot, ROT90,  "Bally Midway", "Shoot the Bull" )
-
 
