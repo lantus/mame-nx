@@ -162,6 +162,17 @@ Stephh's notes (based on the games M68000 code and some tests) :
           . COIN4    : NO EFFECT !
           . SERVICE1 : adds coin(s)/credit(s) depending on "Coin A" Dip Switch
 
+          bbusters:
+
+          If you only calibrate the P1 gun or do not hit the correct spots for all guns
+          you will get either garbage or a black screen when rebooting.
+          According to the manual this happens when the eprom contains invalid gun aim data.
+
+          If you calibrate the guns correctly the game runs as expected:
+          1) Using P1 controls fire at the indicated spots.
+          2) Using P2 controls fire at the indicated spots.
+          3) Using P3 controls fire at the indicated spots.
+
 ***************************************************************************/
 
 #include "driver.h"
@@ -222,10 +233,26 @@ static MACHINE_INIT( mechatt )
 
 /******************************************************************************/
 
-static READ16_HANDLER( sound_cpu_r )
+static int sound_status;
+
+static READ16_HANDLER( sound_status_r )
 {
-	return 0x01;
+	return sound_status;
 }
+
+static WRITE_HANDLER( sound_status_w )
+{
+	sound_status = data;
+}
+
+static WRITE16_HANDLER( sound_cpu_w )
+ {
+	if (ACCESSING_LSB)
+	{
+		soundlatch_w(0,data&0xff);
+	    cpu_set_irq_line(1,IRQ_LINE_NMI,PULSE_LINE);
+	}
+ }
 
 /* Eprom is byte wide, top half of word _must_ be 0xff */
 static READ16_HANDLER( eprom_r )
@@ -237,31 +264,25 @@ static int gun_select;
 
 static READ16_HANDLER( control_3_r )
 {
-	return readinputport(gun_select);
+	UINT16 retdata = readinputport(gun_select);
+	retdata >>=1; /* by lowering the precision of the gun reading hardware the game seems to work better */
+	return retdata;
 }
 
 static WRITE16_HANDLER( gun_select_w )
 {
 	logerror("%08x: gun r\n",activecpu_get_pc());
 
+	cpu_set_irq_line(0, 2, HOLD_LINE);
+
 	gun_select=5 + (data&0xff);
 }
 
 static READ16_HANDLER( kludge_r )
 {
-	bbuster_ram[0xa692/2]=readinputport(5)<<1;
-	bbuster_ram[0xa694/2]=readinputport(6)<<1;
-	bbuster_ram[0xa696/2]=readinputport(7)<<1;
-	bbuster_ram[0xa698/2]=readinputport(8)<<1;
-	bbuster_ram[0xa69a/2]=readinputport(9)<<1;
-	bbuster_ram[0xa69c/2]=readinputport(10)<<1;
-	return 0;
-}
+	/* might latch the gun value? */
+	return 0x0000;
 
-static WRITE16_HANDLER( sound_cpu_w )
-{
-	soundlatch_w(0,data&0xff);
-	cpu_set_irq_line(1,IRQ_LINE_NMI,PULSE_LINE);
 }
 
 static READ16_HANDLER( mechatt_gun_r )
@@ -287,19 +308,22 @@ static MEMORY_READ16_START( bbuster_readmem )
 	{ 0x080000, 0x08ffff, MRA16_RAM },
 	{ 0x090000, 0x090fff, MRA16_RAM },
 	{ 0x0a0000, 0x0a0fff, MRA16_RAM },
+	{ 0x0a1000, 0x0a7fff, MRA16_RAM },	/* service mode */
 	{ 0x0a8000, 0x0a8fff, MRA16_RAM },
+	{ 0x0a9000, 0x0affff, MRA16_RAM },	/* service mode */
 	{ 0x0b0000, 0x0b1fff, MRA16_RAM },
 	{ 0x0b2000, 0x0b3fff, MRA16_RAM },
+	{ 0x0b4000, 0x0b5fff, MRA16_RAM }, 	/* service mode */
 	{ 0x0d0000, 0x0d0fff, MRA16_RAM },
 	{ 0x0e0000, 0x0e0001, input_port_2_word_r }, /* Coins */
 	{ 0x0e0002, 0x0e0003, input_port_0_word_r }, /* Player 1 & 2 */
 	{ 0x0e0004, 0x0e0005, input_port_1_word_r }, /* Player 3 */
 	{ 0x0e0008, 0x0e0009, input_port_3_word_r }, /* Dip 1 */
 	{ 0x0e000a, 0x0e000b, input_port_4_word_r }, /* Dip 2 */
-	{ 0x0e0018, 0x0e0019, sound_cpu_r },
+	{ 0x0e0018, 0x0e0019, sound_status_r },
 	{ 0x0e8000, 0x0e8001, kludge_r },
 	{ 0x0e8002, 0x0e8003, control_3_r },
-	{ 0x0f8000, 0x0f80ff, eprom_r }, /* Eeprom */
+	{ 0x0f8000, 0x0f80ff, eprom_r },  /* Eeprom */
 MEMORY_END
 
 static MEMORY_WRITE16_START( bbuster_writemem )
@@ -307,16 +331,19 @@ static MEMORY_WRITE16_START( bbuster_writemem )
 	{ 0x080000, 0x08ffff, MWA16_RAM, &bbuster_ram },
 	{ 0x090000, 0x090fff, bbuster_video_w, &videoram16 },
 	{ 0x0a0000, 0x0a0fff, MWA16_RAM, &spriteram16, &spriteram_size },
+	{ 0x0a1000, 0x0a7fff, MWA16_RAM },	/* service mode */
 	{ 0x0a8000, 0x0a8fff, MWA16_RAM, &spriteram16_2, &spriteram_2_size },
+	{ 0x0a9000, 0x0affff, MWA16_RAM },	/* service mode */
 	{ 0x0b0000, 0x0b1fff, bbuster_pf1_w, &bbuster_pf1_data },
 	{ 0x0b2000, 0x0b3fff, bbuster_pf2_w, &bbuster_pf2_data },
+	{ 0x0b4000, 0x0b5fff, MWA16_RAM },	/* service mode */
 	{ 0x0b8000, 0x0b8003, MWA16_RAM, &bbuster_pf1_scroll_data },
 	{ 0x0b8008, 0x0b800b, MWA16_RAM, &bbuster_pf2_scroll_data },
 	{ 0x0d0000, 0x0d0fff, paletteram16_RRRRGGGGBBBBxxxx_word_w, &paletteram16 },
 	{ 0x0e8000, 0x0e8001, gun_select_w },
 	{ 0x0f0008, 0x0f0009, MWA16_NOP },
 	{ 0x0f0018, 0x0f0019, sound_cpu_w },
-	{ 0x0f8000, 0x0f80ff, MWA16_RAM, &eprom_data }, /* Eeprom */
+	{ 0x0f8000, 0x0f80ff, MWA16_RAM, &eprom_data },  /* Eeprom */
 MEMORY_END
 
 /*******************************************************************************/
@@ -332,7 +359,7 @@ static MEMORY_READ16_START( mechatt_readmem )
 	{ 0x0e0000, 0x0e0001, input_port_0_word_r },
 	{ 0x0e0002, 0x0e0003, input_port_1_word_r },
 	{ 0x0e0004, 0x0e0007, mechatt_gun_r },
-	{ 0x0e8000, 0x0e8001, sound_cpu_r },
+	{ 0x0e8000, 0x0e8001, sound_status_r },
 MEMORY_END
 
 static MEMORY_WRITE16_START( mechatt_writemem )
@@ -346,7 +373,7 @@ static MEMORY_WRITE16_START( mechatt_writemem )
 	{ 0x0c0000, 0x0c3fff, bbuster_pf2_w, &bbuster_pf2_data },
 	{ 0x0c8000, 0x0c8003, MWA16_RAM, &bbuster_pf2_scroll_data },
 	{ 0x0d0000, 0x0d07ff, paletteram16_RRRRGGGGBBBBxxxx_word_w, &paletteram16 },
-	{ 0x0e4002, 0x0e4003, MWA16_NOP }, /* Gun force feedback? */
+	{ 0x0e4002, 0x0e4003, MWA16_NOP },  /* Gun force feedback? */
 	{ 0x0e8000, 0x0e8001, sound_cpu_w },
 MEMORY_END
 
@@ -361,12 +388,13 @@ MEMORY_END
 static MEMORY_WRITE_START( sound_writemem )
 	{ 0x0000, 0xefff, MWA_ROM },
 	{ 0xf000, 0xf7ff, MWA_RAM },
+	{ 0xf800, 0xf800, sound_status_w },
 MEMORY_END
 
 static PORT_READ_START( sound_readport )
 	{ 0x00, 0x00, YM2610_status_port_0_A_r },
 	{ 0x02, 0x02, YM2610_status_port_0_B_r },
-MEMORY_END
+PORT_END
 
 static PORT_WRITE_START( sound_writeport )
 	{ 0x00, 0x00, YM2610_control_port_0_A_w },
@@ -374,12 +402,12 @@ static PORT_WRITE_START( sound_writeport )
 	{ 0x02, 0x02, YM2610_control_port_0_B_w },
 	{ 0x03, 0x03, YM2610_data_port_0_B_w },
 	{ 0xc0, 0xc1, MWA_NOP }, /* -> Main CPU */
-MEMORY_END
+PORT_END
 
 static PORT_READ_START( sounda_readport )
 	{ 0x00, 0x00, YM2608_status_port_0_A_r },
 	{ 0x02, 0x02, YM2608_status_port_0_B_r },
-MEMORY_END
+PORT_END
 
 static PORT_WRITE_START( sounda_writeport )
 	{ 0x00, 0x00, YM2608_control_port_0_A_w },
@@ -387,25 +415,25 @@ static PORT_WRITE_START( sounda_writeport )
 	{ 0x02, 0x02, YM2608_control_port_0_B_w },
 	{ 0x03, 0x03, YM2608_data_port_0_B_w },
 	{ 0xc0, 0xc1, MWA_NOP }, /* -> Main CPU */
-MEMORY_END
+PORT_END
 
 /******************************************************************************/
 
 INPUT_PORTS_START( bbusters )
 	PORT_START	/* Player controls */
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_START1 )
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER1 )		// "Fire"
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER1 )		// "Grenade"
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER1 )		/* "Fire"*/
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER1 )		/* "Grenade"*/
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_START2 )
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER2 )		// "Fire"
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER2 )		// "Grenade"
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER2 )		/* "Fire"*/
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER2 )		/* "Grenade"*/
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNUSED )
 
 	PORT_START	/* Player controls */
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_START3 )
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER3 )		// "Fire"
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER3 )		// "Grenade"
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER3 )		/* "Fire"*/
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER3 )		/* "Grenade"*/
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -417,8 +445,8 @@ INPUT_PORTS_START( bbusters )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_COIN3 )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_COIN4 )
-	PORT_BITX(0x10, IP_ACTIVE_LOW, IPT_SERVICE2, "Coin 5", IP_KEY_DEFAULT, IP_JOY_DEFAULT )
-	PORT_BITX(0x20, IP_ACTIVE_LOW, IPT_SERVICE3, "Coin 6", IP_KEY_DEFAULT, IP_JOY_DEFAULT )
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_SERVICE1 )		// See notes
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
@@ -441,7 +469,7 @@ INPUT_PORTS_START( bbusters )
 	PORT_DIPSETTING(    0x40, DEF_STR( 1C_3C ) )
 	PORT_DIPSETTING(    0x20, DEF_STR( 1C_4C ) )
 	PORT_DIPSETTING(    0x00, DEF_STR( 1C_6C ) )
-	PORT_DIPNAME( 0x80, 0x80, "Coin Slots" )			// See notes
+	PORT_DIPNAME( 0x80, 0x80, "Coin Slots" )			/* See notes*/
 	PORT_DIPSETTING(    0x80, "Common" )
 	PORT_DIPSETTING(    0x00, "Individual" )
 
@@ -454,7 +482,7 @@ INPUT_PORTS_START( bbusters )
 	PORT_DIPNAME( 0x0c, 0x0c, "Game Mode" )
 	PORT_DIPSETTING(    0x08, "Demo Sounds Off" )
 	PORT_DIPSETTING(    0x0c, "Demo Sounds On" )
-	PORT_BITX( 0,       0x04, IPT_DIPSWITCH_SETTING | IPF_CHEAT, "Infinite Energy", IP_KEY_NONE, IP_JOY_NONE )
+	PORT_DIPSETTING(    0x04, "Infinite Energy (Cheat)")
 	PORT_DIPSETTING(    0x00, "Freeze" )
 	PORT_DIPNAME( 0x10, 0x10, DEF_STR( Unused ) )
 	PORT_DIPSETTING(    0x10, DEF_STR( Off ) )
@@ -465,7 +493,7 @@ INPUT_PORTS_START( bbusters )
 	PORT_DIPNAME( 0x40, 0x40, DEF_STR( Unused ) )
 	PORT_DIPSETTING(    0x40, DEF_STR( Off ) )
 	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
-	PORT_SERVICE( 0x80, IP_ACTIVE_LOW )
+ 	PORT_SERVICE( 0x80, IP_ACTIVE_LOW )
 
 	PORT_START
 	PORT_ANALOG( 0xff, 0x80, IPT_LIGHTGUN_Y | IPF_PLAYER1, 25, 10, 0, 255 )
@@ -488,7 +516,7 @@ INPUT_PORTS_START( bbusters )
 	PORT_DIPSETTING(    0x00, "Japan?" )
 	PORT_DIPSETTING(    0x01, "US?" )
 	PORT_DIPSETTING(    0x02, "World?" )
-//	PORT_DIPSETTING(    0x03, "World?" )			// Same as "0008" - impossible choice ?
+/*	PORT_DIPSETTING(    0x03, "World?" )			*/ /* Same as "0008" - impossible choice ?*/
 #endif
 INPUT_PORTS_END
 
@@ -496,23 +524,23 @@ INPUT_PORTS_START( mechatt )
 	PORT_START
 	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
-	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )		// See notes
+	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )		/* See notes*/
 	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_COIN3 )
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_COIN4 )
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_BUTTON3 )
+	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x0100, IP_ACTIVE_LOW, IPT_START1 )
-	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER1 )	// "Fire"
-	PORT_BIT( 0x0400, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER1 )	// "Grenade"
-	PORT_BIT( 0x0800, IP_ACTIVE_LOW, IPT_BUTTON3 )
+	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER1 )	/* "Fire"*/
+	PORT_BIT( 0x0400, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER1 )	/* "Grenade"*/
+	PORT_BIT( 0x0800, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_START2 )
-	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER2 )	// "Fire"
-	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER2 )	// "Grenade"
-	PORT_BIT( 0x8000, IP_ACTIVE_LOW, IPT_BUTTON3 )
+	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER2 )	/* "Fire"*/
+	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER2 )	/* "Grenade"*/
+	PORT_BIT( 0x8000, IP_ACTIVE_LOW, IPT_UNUSED )
 
 	PORT_START	/* Dip switch bank 1 */
-	PORT_DIPNAME( 0x0001, 0x0001, "Coin Slots" )		// See notes
+	PORT_DIPNAME( 0x0001, 0x0001, "Coin Slots" )		/* See notes*/
 	PORT_DIPSETTING(      0x0001, "Common" )
 	PORT_DIPSETTING(      0x0000, "Individual" )
 	PORT_DIPNAME( 0x0002, 0x0002, "Allow Continue" )
@@ -523,12 +551,12 @@ INPUT_PORTS_START( mechatt )
 	PORT_DIPSETTING(      0x000c, "6 / 3" )
 	PORT_DIPSETTING(      0x0004, "7 / 4" )
 	PORT_DIPSETTING(      0x0000, "8 / 5" )
-	PORT_DIPNAME( 0x0030, 0x0030, DEF_STR( Coin_A ) )	// See notes
+	PORT_DIPNAME( 0x0030, 0x0030, DEF_STR( Coin_A ) )	/* See notes*/
 	PORT_DIPSETTING(      0x0000, DEF_STR( 4C_1C ) )
 	PORT_DIPSETTING(      0x0010, DEF_STR( 3C_1C ) )
 	PORT_DIPSETTING(      0x0020, DEF_STR( 2C_1C ) )
 	PORT_DIPSETTING(      0x0030, DEF_STR( 1C_1C ) )
-	PORT_DIPNAME( 0x00c0, 0x00c0, DEF_STR( Coin_B ) )	// See notes
+	PORT_DIPNAME( 0x00c0, 0x00c0, DEF_STR( Coin_B ) )	/* See notes*/
 	PORT_DIPSETTING(      0x00c0, DEF_STR( 1C_1C ) )
 	PORT_DIPSETTING(      0x0080, DEF_STR( 1C_2C ) )
 	PORT_DIPSETTING(      0x0040, DEF_STR( 1C_3C ) )
@@ -541,7 +569,7 @@ INPUT_PORTS_START( mechatt )
 	PORT_DIPNAME( 0x0c00, 0x0c00, "Game Mode" )
 	PORT_DIPSETTING(      0x0800, "Demo Sounds Off" )
 	PORT_DIPSETTING(      0x0c00, "Demo Sounds On" )
-	PORT_BITX( 0,         0x0400, IPT_DIPSWITCH_SETTING | IPF_CHEAT, "Infinite Energy", IP_KEY_NONE, IP_JOY_NONE )
+	PORT_DIPSETTING(      0x0400, "Infinite Energy (Cheat)")
 	PORT_DIPSETTING(      0x0000, "Freeze" )
 	PORT_DIPNAME( 0x1000, 0x1000, DEF_STR( Unused ) )
 	PORT_DIPSETTING(      0x1000, DEF_STR( Off ) )
@@ -552,7 +580,7 @@ INPUT_PORTS_START( mechatt )
 	PORT_DIPNAME( 0x4000, 0x4000, DEF_STR( Unused ) )
 	PORT_DIPSETTING(      0x4000, DEF_STR( Off ) )
 	PORT_DIPSETTING(      0x0000, DEF_STR( On ) )
-	PORT_SERVICE( 0x8000, IP_ACTIVE_LOW )
+ 	PORT_SERVICE( 0x8000, IP_ACTIVE_LOW )
 
 	PORT_START
 	PORT_ANALOG( 0xff, 0x80, IPT_LIGHTGUN_X | IPF_PLAYER1, 25, 10, 0, 255 )
@@ -665,7 +693,7 @@ struct YM2610interface ym2610_interface =
 {
 	1,
 	8000000,
-	{ MIXERG(15,MIXER_GAIN_4x,MIXER_PAN_CENTER) },
+	{ MIXERG(100,MIXER_GAIN_4x,MIXER_PAN_CENTER) },
 	{ 0 },
 	{ 0 },
 	{ 0 },
@@ -673,10 +701,32 @@ struct YM2610interface ym2610_interface =
 	{ sound_irq },
 	{ REGION_SOUND2 },
 	{ REGION_SOUND1 },
-	{ YM3012_VOL(20,MIXER_PAN_LEFT,20,MIXER_PAN_RIGHT) }
+	{ YM3012_VOL(100,MIXER_PAN_LEFT,100,MIXER_PAN_RIGHT) }
 };
 
 /******************************************************************************/
+
+/* default eeprom with reasonable calibration for MAME */
+unsigned char bbusters_default_eeprom[128] = {
+	                                    /*y*/                   /*y*/
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x74, 0x00, 0x00, 0x00, 0xEE, 0x00,
+	0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x7E, 0x00, 0x00, 0x00, 0xFE, 0x00,
+	                                    /*y*/                   /*y*/
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x74, 0x00,	0x00, 0x00, 0xEE, 0x00,
+	0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x7E, 0x00, 0x00, 0x00, 0xFE, 0x00,
+	                                    /*y*/                   /*y*/
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x74, 0x00,	0x00, 0x00, 0xEE, 0x00,
+	0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x7E, 0x00, 0x00, 0x00, 0xFE, 0x00,
+
+
+	0x42, 0x00, 0x45, 0x00, 0x41, 0x00, 0x53, 0x00,	0x54, 0x00, 0x20, 0x00,
+	0x42, 0x00, 0x55, 0x00, 0x53, 0x00, 0x54, 0x00, 0x45, 0x00, 0x52, 0x00,
+	0x53, 0x00, 0x20, 0x00, 0x54, 0x00, 0x4D, 0x00, 0xFF, 0xFF, 0xFF, 0xFF,
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+};
+
+
 
 static NVRAM_HANDLER( bbusters )
 {
@@ -687,17 +737,10 @@ static NVRAM_HANDLER( bbusters )
 		if (file)
 			mame_fread (file, eprom_data, 0x80);
 		else
-			memset (eprom_data, 0xff, 0x80);
+			memcpy(eprom_data, bbusters_default_eeprom, 0x80);
 	}
 }
 
-static INTERRUPT_GEN( bbuster )
-{
-	if (cpu_getiloops()==0)
-		cpu_set_irq_line(0, 6, HOLD_LINE); /* VBL */
-	else
-		cpu_set_irq_line(0, 2, HOLD_LINE); /* at least 6 interrupts per frame to read gun controls */
-}
 
 static VIDEO_EOF( bbuster )
 {
@@ -715,7 +758,7 @@ static MACHINE_DRIVER_START( bbusters )
 	/* basic machine hardware */
 	MDRV_CPU_ADD(M68000, 12000000)
 	MDRV_CPU_MEMORY(bbuster_readmem,bbuster_writemem)
-	MDRV_CPU_VBLANK_INT(bbuster,4)
+	MDRV_CPU_VBLANK_INT(irq6_line_hold,1)
 
 	MDRV_CPU_ADD(Z80,4000000) /* Accurate */
 	MDRV_CPU_FLAGS(CPU_AUDIO_CPU)
@@ -732,7 +775,7 @@ static MACHINE_DRIVER_START( bbusters )
 
 	/* video hardware */
 	MDRV_VIDEO_ATTRIBUTES(VIDEO_TYPE_RASTER | VIDEO_BUFFERS_SPRITERAM)
-	MDRV_SCREEN_SIZE(32*8, 32*8)
+	MDRV_SCREEN_SIZE(64*8, 32*8)
 	MDRV_VISIBLE_AREA(0*8, 32*8-1, 2*8, 30*8-1)
 	MDRV_GFXDECODE(gfxdecodeinfo)
 	MDRV_PALETTE_LENGTH(2048)
@@ -766,7 +809,7 @@ static MACHINE_DRIVER_START( mechatt )
 
 	/* video hardware */
 	MDRV_VIDEO_ATTRIBUTES(VIDEO_TYPE_RASTER | VIDEO_BUFFERS_SPRITERAM)
-	MDRV_SCREEN_SIZE(32*8, 32*8)
+	MDRV_SCREEN_SIZE(64*8, 32*8)
 	MDRV_VISIBLE_AREA(0*8, 32*8-1, 2*8, 30*8-1)
 	MDRV_GFXDECODE(gfxdecodeinfo_mechatt)
 	MDRV_PALETTE_LENGTH(1024)
